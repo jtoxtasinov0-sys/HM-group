@@ -5,10 +5,14 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
  * Yaltiroq pol: oddiy PBR material + tekis aks (planar reflection).
  * Reflector faqat aks teksturasini chizadi, rangni esa MeshStandardMaterial beradi.
  */
-export function createGlossyFloor({ width, depth, color, map, repeat = 1, roughness = 0.4, strength = 0.55, resolution = 0.5, reflect = true }) {
+export function createGlossyFloor({ width, depth, color, map, roughnessMap, repeat = 1, roughness = 0.4, strength = 0.55, resolution = 0.5, reflect = true, seams = true }) {
   const geo = new THREE.PlaneGeometry(width, depth);
-  const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.1, map, envMapIntensity: 0.3 });
-  if (map) { map.repeat.set(repeat * width / depth, repeat); }
+  const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.1, map, roughnessMap, envMapIntensity: 0.3 });
+  for (const t of [map, roughnessMap]) if (t) t.repeat.set(repeat * width / depth, repeat);
+  // plitka choklarida aks so'nadi; choksiz polda — g'adirroq joylarda
+  const seamGLSL = seams
+    ? '#ifdef USE_MAP\n seam = smoothstep(0.75, 0.95, texture2D(map, vMapUv).r);\n #endif'
+    : '#ifdef USE_ROUGHNESSMAP\n seam = 1.0 - 0.6 * smoothstep(0.2, 0.45, texture2D(roughnessMap, vRoughnessMapUv).g);\n #endif';
 
   if (!reflect) {
     const mesh = new THREE.Mesh(geo, mat);
@@ -52,11 +56,8 @@ export function createGlossyFloor({ width, depth, color, map, repeat = 1, roughn
       .replace('#include <opaque_fragment>', `
         {
           vec2 ruv = vReflUv.xy / vReflUv.w;
-          // plitka choklarida aks biroz so'nadi
           float seam = 1.0;
-          #ifdef USE_MAP
-            seam = smoothstep(0.75, 0.95, texture2D(map, vMapUv).r);
-          #endif
+          ${seamGLSL}
           float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
           float fres = 0.25 + 0.75 * pow(1.0 - ndv, 3.0);
           outgoingLight += sampleRefl(ruv) * uReflStrength * seam * fres;

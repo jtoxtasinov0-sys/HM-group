@@ -142,6 +142,7 @@ export function createOcean({ sunDir, sunColor = '#fff3df', waterColor = '#0b2c4
       // to'lqin yon tomonida quyosh nuri suv ichidan o'tadi (yashil-ko'k porlash)
       float sss = pow( max( 0.0, dot( eyeDirection, -sunDirection ) ), 3.0 ) * max( 0.0, surfaceNormal.x * 0.5 + surfaceNormal.z * 0.5 + 0.2 );
       scatter += vec3( 0.05, 0.22, 0.24 ) * sss * 0.6 + waterColor * 0.35;`);
+  mat.fragmentShader = mat.fragmentShader.replace('gl_FragColor = vec4( outgoingLight, alpha );', 'gl_FragColor = vec4( min( outgoingLight, vec3( 5.0 ) ), alpha );');
   mat.uniforms.size.value = 1.0;
   water.rotation.x = -Math.PI / 2;
   water.position.y = y;

@@ -38,7 +38,7 @@ export function prepareShip(ship) {
     m.onBeforeCompile = (s) => {
       s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
         float hmL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-        diffuseColor.rgb = mix(vec3(hmL), diffuseColor.rgb, 0.7) * 0.92;`);
+        diffuseColor.rgb = mix(vec3(hmL), diffuseColor.rgb, 0.5) * 0.84;`);
     };
     m.customProgramCacheKey = () => 'ship-real';
     m.needsUpdate = true;
@@ -208,7 +208,7 @@ export function createPort({ quality }) {
   const group = new THREE.Group();
   group.name = 'port';
 
-  const sky = createSky({ sunDir: P.sunDir, turbidity: 3.6, rayleigh: 1.6, mie: 0.0045, mieG: 0.84, clouds: 0.3, gain: 2.1 });
+  const sky = createSky({ sunDir: P.sunDir, turbidity: 2.4, rayleigh: 2.3, mie: 0.003, mieG: 0.82, clouds: 0.3, gain: 2.1 });
   sky.groundColor = '#3b4a58';
   group.add(sky.mesh);
 

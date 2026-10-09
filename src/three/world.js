@@ -14,7 +14,7 @@ import { createContainer, createSpreader } from './container.js';
 import { createPort, prepareShip } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
-import { createStory, GARAGE_FOG } from './story.js';
+import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR } from './story.js';
 import { rigWheels } from './wheels.js';
 
 const GradeShader = {
@@ -88,7 +88,7 @@ export class World {
     this.renderer = renderer;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(GARAGE_FOG.clone(), 30, 95);
+    scene.fog = new THREE.Fog(GARAGE_FOG.clone(), FOG_NEAR, FOG_FAR);
     scene.background = GARAGE_FOG.clone();
     this.scene = scene;
 
@@ -103,6 +103,7 @@ export class World {
     // dunyolar
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
+    this.envYard = createSkyEnvMap(renderer, this.garage.anim.yardSky);
     this.port = createPort({ quality });
     this.skyUniforms = this.port.sky.uniforms;
     this.envSky = createSkyEnvMap(renderer, this.port.sky);
@@ -172,6 +173,7 @@ export class World {
       const model = gltfs[i].scene;
       const rig = rigWheels(model, car.wheels);
       const { mats } = prepareCarMaterials(model, car);
+      model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
       const box = this.manifest[car.id]?.box || { min: [-1, 0, -2.5], max: [1, 1.6, 2.5] };
       const size = new THREE.Vector3(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]);
 
@@ -292,7 +294,8 @@ export class World {
 
     this.story.update(this.p, dt, this.time);
     this.grade.uniforms.uTime.value = this.time;
-    this.port.update(this.time, this.camera, this.container.group.position);
+    if (this.garage.group.visible) this.garage.anim.update(this.time, this.camera);
+    else this.port.update(this.time, this.camera, this.container.group.position);
     this.composer.render();
     this.emit('frame', this.p);
   }

@@ -79,23 +79,6 @@ export function makeOutlineTextTexture(text) {
   return tex(c);
 }
 
-/** Pol plitkasi: katta plitalar orasida ingichka choklar */
-export function makeFloorTexture() {
-  const [c, ctx] = canvas(1024, 1024);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 1024, 1024);
-  // plitalarning nozik farqi
-  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
-    const v = 244 + Math.round(Math.random() * 9);
-    ctx.fillStyle = `rgb(${v},${v},${v + 1})`;
-    ctx.fillRect(x * 512 + 2, y * 512 + 2, 508, 508);
-  }
-  ctx.fillStyle = '#c6ccd4';
-  ctx.fillRect(0, 0, 1024, 2); ctx.fillRect(0, 512, 1024, 2);
-  ctx.fillRect(0, 0, 2, 1024); ctx.fillRect(512, 0, 2, 1024);
-  return tex(c, { repeat: true });
-}
-
 /** Platforma atrofidagi qora rezina halqa: radial bo'g'inlar (rasmdagi kabi segmentli) */
 export function makeRubberTexture() {
   const [c, ctx] = canvas(1024, 1024);
@@ -232,35 +215,6 @@ export function makeContainerDoorDecal() {
   drawHM(ctx, 820, 820, 120, '#fff', 8);
   wearPaint(ctx, 1024, 1024, 72);
   return tex(c);
-}
-
-/** Rolling eshik plastinkalari */
-export function makeShutterTexture() {
-  const [c, ctx] = canvas(256, 1024);
-  for (let y = 0; y < 1024; y += 64) {
-    const g = ctx.createLinearGradient(0, y, 0, y + 64);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.5, '#e4e8ee');
-    g.addColorStop(0.92, '#c8ced8');
-    g.addColorStop(1, '#8f99a6');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, y, 256, 64);
-  }
-  return tex(c, { repeat: true });
-}
-
-/** Asfalt / port maydoni */
-export function makeGroundTexture() {
-  const [c, ctx] = canvas(512, 512);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 512, 512);
-  const img = ctx.getImageData(0, 0, 512, 512);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = 215 + Math.random() * 40;
-    img.data[i] = img.data[i + 1] = v; img.data[i + 2] = v + 3;
-  }
-  ctx.putImageData(img, 0, 0);
-  return tex(c, { repeat: true });
 }
 
 // =====================================================================================
@@ -571,159 +525,123 @@ export function makeStackTextures() {
   return { map, roughnessMap, normalMap: tex(heightToNormal(hc, 4, { wrap: false }), { srgb: false }) };
 }
 
-/** Halo yoritilgan logo uchun yumshoq nur (logoning orqasida devorga tushadi) */
-export function makeLogoGlowTexture() {
-  const [c, ctx] = canvas(1024, 512);
-  ctx.clearRect(0, 0, 1024, 512);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 22;
-  ctx.beginPath(); ctx.arc(512, 200, 150, 0, Math.PI * 2); ctx.stroke();
-  drawHM(ctx, 512, 200, 165, '#fff', 30);
-  ctx.fillStyle = '#fff';
-  ctx.font = `400 58px ${FONT}`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '21px';
-  ctx.fillText('HM GROUP', 512 + 10, 430);
-  const b = softBlur(softBlur(c, 10), 6);
-  // keng, yumshoq "halo" + yaqinroq porlash
-  const [o, octx] = canvas(1024, 512);
-  octx.drawImage(softBlur(b, 18), 0, 0);
-  octx.globalAlpha = 0.9;
-  octx.drawImage(b, 0, 0);
-  return tex(o);
+/**
+ * Sayqallangan beton pol (showroom): choksiz, bulutsimon nozik dog'lar, mayda toshchalar,
+ * yaltiroqlik notekis (akslar joy-joyida xiraroq). Bitta tekstura ~8 m (takrorlanadi).
+ */
+export function makePolishedFloorTextures() {
+  const S = 1024;
+  const r = rand(81);
+  const big = noiseField(256, 256, { cells: 3, octaves: 5, seed: 82 });
+  const mid = noiseField(256, 256, { cells: 14, octaves: 3, seed: 83 });
+  const [c, ctx] = canvas(S, S);
+  ctx.drawImage(fieldCanvas(big, 256, 256, (v, u, t) => {
+    const m = mid[Math.floor(t * 256) * 256 + Math.floor(u * 256)];
+    const k = 208 + (v - 0.5) * 22 + (m - 0.5) * 7;
+    return [k, k + 3, k + 7, 255];
+  }), 0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = (r() - 0.5) * 7 + (r() < 0.004 ? -22 : 0);
+    img.data[i] += v; img.data[i + 1] += v; img.data[i + 2] += v;
+  }
+  ctx.putImageData(img, 0, 0);
+  const rough = fieldCanvas(mid, 256, 256, (v, u, t) => {
+    const b = big[Math.floor(t * 256) * 256 + Math.floor(u * 256)];
+    const k = 40 + v * 34 + b * 26;
+    return [k, k, k, 255];
+  });
+  const [rc, rctx] = canvas(S, S);
+  rctx.drawImage(rough, 0, 0, S, S);
+  return { map: tex(c, { repeat: true, aniso: 16 }), roughnessMap: tex(rc, { srgb: false, repeat: true }) };
 }
 
 /**
- * Zamonaviy seksiyali garaj darvozasi: antratsit metall panellar, gorizontal qovurg'alar,
- * bitta qatorda xira oynali derazalar (tashqaridan kunduzgi yorug'lik tushadi).
- * Qaytaradi: { map, normalMap, roughnessMap, emissiveMap }
+ * Silliq gips devor: nozik dog'lar, shift ostida yengil soya, pastga qarab biroz to'q-ko'kish tus
+ * va pol bilan tutashgan joyda soya (AO). Tekstura gorizontal takrorlanadi, vertikal — butun devor.
  */
-export function makeSectionalDoorTextures({ panels = 8, windowsRow = 1, windows = 6 } = {}) {
-  const W = 1024, H = 834;
-  const ph = H / panels;
-  const r = rand(51);
+export function makePlasterWallTexture() {
+  const W = 512, H = 1024;
+  const n = noiseField(128, 256, { cells: 4, octaves: 5, seed: 91 });
+  const c = fieldCanvas(n, 128, 256, (v, u, t) => {
+    let k = 229 + (v - 0.5) * 8;
+    k -= 16 * Math.max(0, 1 - t / 0.05);                 // shift ostidagi soya
+    const low = Math.max(0, (t - 0.35) / 0.65);
+    k -= 26 * low * low;                                    // pastga qarab to'qroq
+    k -= 18 * Math.max(0, (t - 0.965) / 0.035);             // pol bilan tutashuv
+    return [k - 3 * low, k, k + 4 + 4 * low, 255];
+  });
+  const [o, octx] = canvas(W, H);
+  octx.imageSmoothingQuality = 'high';
+  octx.drawImage(c, 0, 0, W, H);
+  return tex(o, { repeat: true });
+}
+
+/**
+ * Downlight devorni yoritganda hosil bo'ladigan "nur yelpig'ichi" (wall-wash scallop):
+ * tepasi yoysimon chegarali yorqin dog', pastga kengayib so'nadi. Qora fon — additive aralashtiriladi.
+ */
+export function makeScallopTexture() {
+  const W = 256, H = 512;
+  const [c, ctx] = canvas(W, H);
+  const img = ctx.createImageData(W, H);
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let y = 0; y < H; y++) {
+    const t = y / H;
+    for (let x = 0; x < W; x++) {
+      const u = (x / W) * 2 - 1;
+      const top = 0.07 + 0.42 * u * u;                       // yuqori yoy chegarasi
+      const half = 0.2 + 0.75 * t;                           // pastga kengayadi
+      let k = sm(top - 0.015, top + 0.05, t) * (1 - sm(half * 0.55, half, Math.abs(u)));
+      k *= Math.exp(-Math.max(0, t - top) * 2.6);            // pastga so'nadi
+      k += 0.35 * Math.exp(-Math.pow((t - top - 0.03) / 0.03, 2)) * (1 - sm(0.2, 0.5, Math.abs(u))) * (t > top ? 1 : 0); // yorqin "qalpoq"
+      const v = Math.min(255, k * 255);
+      const i = (y * W + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return tex(softBlur(c, 2.5), { repeat: true });
+}
+
+/**
+ * Alyumin roll-darvoza (rolstavni) plastinkalari: har biri ~7.7 sm, qavariq profil, orasida
+ * qorong'i tirqish, gorizontal cho'tkalangan metall. Tekstura 1 m balandlikni bildiradi.
+ * Qaytaradi: { map, normalMap, roughnessMap }
+ */
+export function makeShutterTextures() {
+  const W = 256, H = 512, slats = 13;
+  const r = rand(97);
   const [c, ctx] = canvas(W, H);
   const [hc, hctx] = canvas(W, H);
   const [rc, rctx] = canvas(W, H);
-  const [ec, ectx] = canvas(W, H);
-  ectx.fillStyle = '#000'; ectx.fillRect(0, 0, W, H);
-
-  // asos: antratsit, gorizontal "cho'tkalangan" chiziqlar
-  ctx.fillStyle = '#3b4148'; ctx.fillRect(0, 0, W, H);
-  for (let i = 0; i < 1400; i++) {
-    const y = r() * H, x = r() * W, len = 40 + r() * 260;
-    ctx.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.012 + r() * 0.02})` : `rgba(0,0,0,${0.02 + r() * 0.03})`;
+  for (let y = 0; y < H; y++) {
+    const t = ((y / H) * slats) % 1;                         // plastinka ichida (tepadan)
+    let k, h, ro;
+    if (t < 0.07) { k = 70; h = 0; ro = 150; }                // tirqish
+    else {
+      const s = (t - 0.07) / 0.93;
+      h = Math.sin(s * Math.PI);
+      // tepaga qaragan qismi yorug'roq (shiftdagi yorug'lik), pastki qismi soyada
+      k = 176 + 34 * Math.cos(s * Math.PI * 0.9) * 0.6 + 18 * h;
+      if (Math.abs(s - 0.52) < 0.03) k -= 18;                 // o'rtadagi qovurg'a
+      ro = 92;
+    }
+    ctx.fillStyle = `rgb(${Math.round(k - 3)},${Math.round(k)},${Math.round(k + 5)})`; ctx.fillRect(0, y, W, 1);
+    const hv = Math.round(40 + h * 200);
+    hctx.fillStyle = `rgb(${hv},${hv},${hv})`; hctx.fillRect(0, y, W, 1);
+    rctx.fillStyle = `rgb(${ro},${ro},${ro})`; rctx.fillRect(0, y, W, 1);
+  }
+  // cho'tkalangan metall chiziqlari
+  for (let i = 0; i < 900; i++) {
+    const y = r() * H, x = r() * W, len = 30 + r() * 180;
+    ctx.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.03 + r() * 0.05})` : `rgba(0,0,0,${0.03 + r() * 0.05})`;
     ctx.fillRect(x, y, len, 1);
   }
-  hctx.fillStyle = 'rgb(128,128,128)'; hctx.fillRect(0, 0, W, H);
-  rctx.fillStyle = 'rgb(100,100,100)'; rctx.fillRect(0, 0, W, H);
-
-  for (let p = 0; p < panels; p++) {
-    const y0 = p * ph;
-    const g = ctx.createLinearGradient(0, y0, 0, y0 + ph);
-    g.addColorStop(0, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(0,0,0,0.06)');
-    ctx.fillStyle = g; ctx.fillRect(0, y0, W, ph);
-    // panel choki: chuqur ariq (soyasi tepada, yorug' qirrasi pastda)
-    ctx.fillStyle = 'rgba(8,10,12,0.9)'; ctx.fillRect(0, y0, W, 3);
-    ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(0, y0 + 3, W, 1.5);
-    hctx.fillStyle = '#000'; hctx.fillRect(0, y0, W, 4);
-    // ikkita sayoz qovurg'a
-    for (const k of [1 / 3, 2 / 3]) {
-      const y = y0 + ph * k;
-      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(0, y - 1, W, 1.5);
-      ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(0, y + 0.5, W, 1);
-      hctx.fillStyle = 'rgb(96,96,96)'; hctx.fillRect(0, y - 1.5, W, 3);
-    }
-  }
-  // derazalar qatori
-  if (windowsRow >= 0) {
-    const y0 = windowsRow * ph;
-    const margin = W * 0.07, gap = W * 0.03;
-    const ww = (W - margin * 2 - gap * (windows - 1)) / windows, wh = ph * 0.46;
-    const wy = y0 + (ph - wh) / 2;
-    for (let i = 0; i < windows; i++) {
-      const wx = margin + i * (ww + gap);
-      ctx.fillStyle = '#121518'; ctx.beginPath(); ctx.roundRect(wx - 5, wy - 5, ww + 10, wh + 10, 6); ctx.fill();
-      const gg = ctx.createLinearGradient(0, wy, 0, wy + wh);
-      gg.addColorStop(0, '#eef3f8'); gg.addColorStop(1, '#c9d3dd');
-      ctx.fillStyle = gg; ctx.fillRect(wx, wy, ww, wh);
-      const eg = ectx.createLinearGradient(0, wy, 0, wy + wh);
-      eg.addColorStop(0, '#ffffff'); eg.addColorStop(1, '#b8c4d0');
-      ectx.fillStyle = eg; ectx.fillRect(wx, wy, ww, wh);
-      hctx.fillStyle = 'rgb(200,200,200)'; hctx.fillRect(wx - 5, wy - 5, ww + 10, wh + 10);
-      hctx.fillStyle = 'rgb(150,150,150)'; hctx.fillRect(wx, wy, ww, wh);
-      rctx.fillStyle = 'rgb(30,30,30)'; rctx.fillRect(wx, wy, ww, wh);
-    }
-  }
-  // pastki rezina zichlagich va chetdagi profillar
-  ctx.fillStyle = '#0d0f11'; ctx.fillRect(0, H - 8, W, 8);
-  hctx.fillStyle = 'rgb(160,160,160)'; hctx.fillRect(0, H - 8, W, 8);
-  for (const x of [0, W - 10]) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, 0, 10, H); }
-
   return {
-    map: tex(c, { aniso: 16 }),
-    normalMap: tex(heightToNormal(softBlur(hc, 1.2), 5, { wrap: false }), { srgb: false, aniso: 16 }),
-    roughnessMap: tex(rc, { srgb: false }),
-    emissiveMap: tex(ec),
+    map: tex(c, { repeat: true, aniso: 16 }),
+    normalMap: tex(heightToNormal(hc, 3), { srgb: false, repeat: true, aniso: 16 }),
+    roughnessMap: tex(rc, { srgb: false, repeat: true }),
   };
-}
-
-/**
- * Oq vertikal ariqchali ("fluted") devor paneli — markaziy devor uchun. Tepadagi LED chiziq
- * devorni silab yoritadi (wall-washer). 1 m kenglik (takrorlanadi).
- */
-export function makeFlutedWallTextures() {
-  const W = 256, H = 1024;
-  const flutes = 12; // ~8 sm
-  const fw = W / flutes;
-  const [c, ctx] = canvas(W, H);
-  const [hc, hctx] = canvas(W, H);
-  for (let i = 0; i < flutes; i++) {
-    const x0 = i * fw;
-    for (let x = 0; x < fw; x++) {
-      const t = x / fw;
-      const sh = Math.sin(t * Math.PI);
-      const k = Math.round(236 + sh * 10 - (t > 0.5 ? (t - 0.5) * 18 : 0));
-      ctx.fillStyle = `rgb(${k},${k},${k + 2})`; ctx.fillRect(x0 + x, 0, 1, H);
-      const hv = Math.round(70 + sh * 160);
-      hctx.fillStyle = `rgb(${hv},${hv},${hv})`; hctx.fillRect(x0 + x, 0, 1, H);
-    }
-    ctx.fillStyle = 'rgba(120,128,140,0.35)'; ctx.fillRect(x0, 0, 1, H);
-  }
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.35, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(60,66,76,0.16)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  return {
-    map: tex(c, { repeat: true }),
-    normalMap: tex(heightToNormal(hc, 2.5), { srgb: false, repeat: true }),
-  };
-}
-
-/**
- * Katta formatli devor panellari (oq galereya): ingichka choklar, panellarning nozik tus farqi,
- * devor pastida va tepasida yumshoq soya. Tekstura 6 m × shift balandligini bildiradi.
- */
-export function makeWallPanelTexture() {
-  const W = 1024, H = 1024;
-  const cols = 5, rows = 3;
-  const r = rand(61);
-  const [c, ctx] = canvas(W, H);
-  const pw = W / cols, ph = H / rows;
-  for (let j = 0; j < rows; j++) {
-    for (let i = 0; i < cols; i++) {
-      const k = 236 + Math.round(r() * 6);
-      ctx.fillStyle = `rgb(${k},${k + 1},${k + 3})`; ctx.fillRect(i * pw, j * ph, pw, ph);
-    }
-  }
-  ctx.fillStyle = 'rgba(150,158,170,0.9)';
-  for (let i = 0; i < cols; i++) ctx.fillRect(i * pw, 0, 2, H);
-  for (let j = 0; j < rows; j++) ctx.fillRect(0, j * ph, W, 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  for (let i = 0; i < cols; i++) ctx.fillRect(i * pw + 2, 0, 1, H);
-  for (let j = 0; j < rows; j++) ctx.fillRect(0, j * ph + 2, W, 1);
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, 'rgba(70,78,90,0.10)'); g.addColorStop(0.12, 'rgba(70,78,90,0)');
-  g.addColorStop(0.8, 'rgba(70,78,90,0)'); g.addColorStop(1, 'rgba(70,78,90,0.16)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  return tex(c, { repeat: true });
 }

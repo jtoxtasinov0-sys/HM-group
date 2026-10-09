@@ -29,7 +29,8 @@ export function createSky(opts = {}) {
   const fragmentShader = shader.fragmentShader
     .replace('uniform float time;', 'uniform float time;\nuniform float uGain;\nuniform float uFade;\nuniform vec3 uFadeColor;')
     .replace('gl_FragColor = vec4( texColor, 1.0 );', `
-      texColor *= uGain;
+      // quyosh diski juda yorqin (minglab) — bloom butun kadrni yutmasligi uchun cheklanadi
+      texColor = min( texColor * uGain, vec3( 4.5 ) );
       texColor = mix( texColor, uFadeColor, uFade );
       gl_FragColor = vec4( texColor, 1.0 );`);
 
@@ -61,12 +62,14 @@ export function createSky(opts = {}) {
 
 /**
  * Osmondan muhit xaritasi (PBR akslar va yoritish uchun). Quyosh diski o'chiriladi —
- * aks ichida "yorqin nuqta" chiqmasin.
+ * aks ichida "yorqin nuqta" chiqmasin. gain — osmonga nisbatan yorqinlik (to'g'ridan-to'g'ri
+ * quyosh nuri alohida chiroq bilan beriladi, shuning uchun muhit biroz xiraroq bo'lishi kerak).
  */
-export function createSkyEnvMap(renderer, sky) {
+export function createSkyEnvMap(renderer, sky, gain = 0.5) {
   const scene = new THREE.Scene();
   const m = sky.mesh.material.clone(); // uniformlar ham nusxalanadi
   m.uniforms.showSunDisc.value = 0;
+  m.uniforms.uGain.value *= gain;
   m.uniforms.uFade.value = 0;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), m);
   mesh.scale.setScalar(50);

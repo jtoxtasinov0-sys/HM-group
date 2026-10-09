@@ -38,7 +38,8 @@ export const T = {
 
 const STAGE_YAW = 0.55;
 const LIFT_TOP = 30;
-export const GARAGE_FOG = new THREE.Color('#e9ecf0');
+export const GARAGE_FOG = new THREE.Color('#dfe6ee'); // hovli ufqidagi havo rangi
+export const FOG_NEAR = 70, FOG_FAR = 340;
 const HAZE = new THREE.Color('#d3e1ef');
 
 export function createStory(world) {
@@ -329,9 +330,11 @@ export function createStory(world) {
       world2 = want;
       garage.group.visible = !inPort;
       port.group.visible = inPort;
-      scene.environment = inPort ? world.envSky : world.envGarage;
       ents.forEach((e) => { e.root.visible = !inPort; });
     }
+    // muhit xaritasi: garaj ichi → hovli (mashina eshikdan chiqqanda) → port
+    const env = inPort ? world.envSky : p > T.driveA + 0.075 ? world.envYard : world.envGarage;
+    if (scene.environment !== env) scene.environment = env;
 
     // tuman
     const fogIn = easeSine(seg(p, T.fogInA, T.fogInB));
@@ -340,8 +343,8 @@ export function createStory(world) {
     const fog = scene.fog;
     fog.color.copy(GARAGE_FOG).lerp(HAZE, hazeMix);
     if (p < T.fogOutA) {
-      fog.near = lerp(30, 12.5, fogIn);
-      fog.far = lerp(95, 19, fogIn);
+      fog.near = lerp(FOG_NEAR, 12.5, fogIn);
+      fog.far = lerp(FOG_FAR, 19, fogIn);
     } else {
       fog.near = lerp(12.5, 160, fogOut);
       fog.far = lerp(19, lerp(1600, 2600, seg(p, 0.8, 1)), fogOut);
@@ -352,20 +355,23 @@ export function createStory(world) {
 
     // ekspozitsiya / bloom
     const portK = seg(p, T.swap, T.fogOutB);
-    // oq garajda bloom o'chiq (oq devorlar tuman kabi porlab ketadi) — faqat dengizda
-    world.bloom.enabled = p > T.fogInA;
-    world.bloom.strength = 0.08;
-    world.bloom.threshold = 1.6;
+    // garajda faqat juda yorqin narsalar porlaydi (tom-oyna, chiroqlar) — oq devorlar emas
+    world.bloom.enabled = true;
+    // garajda faqat chiroqlar porlaydi (mashina lakidagi akslar emas — aks holda "tuman" bo'ladi)
+    world.bloom.strength = lerp(0.28, 0.16, portK);
+    world.bloom.threshold = lerp(5.0, 5.5, portK);
+    world.bloom.radius = lerp(0.42, 0.3, portK);
     world.renderer.toneMappingExposure = lerp(1.0, 0.92, portK);
     world.grade.uniforms.uVignette.value = lerp(0.6, 0.35, portK);
 
     // --- garaj ichidagi animatsiyalar ---
     if (!inPort) {
-      // rolling eshik
+      // roll-darvoza va hovlidagi quyosh
       const sh = ease(seg(p, T.shutA, T.shutB)) * (1 - ease(seg(p, T.closeB + 0.005, T.closeB + 0.04)));
-      const s = 1 - sh * 0.96;
-      A.shutter.scale.y = s;
-      A.shutter.position.y = G.doorH - (G.doorH * s) / 2;
+      A.setShutter(sh);
+      A.outdoor(seg(p, T.shutA - 0.01, T.shutA + 0.02));
+      A.yardSky.uniforms.uFadeColor.value.copy(fog.color);
+      A.yardSky.uniforms.uFade.value = fogIn;
 
       // katta nom
       const show = seg(p, 0.06, 0.1) * (1 - seg(p, T.showB - 0.01, T.turnB));

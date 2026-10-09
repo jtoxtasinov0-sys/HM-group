@@ -71,7 +71,7 @@ export function createContainer() {
   const grime = makeGrimeTexture(9);
   const frame = new THREE.MeshStandardMaterial({ color: '#1f3b62', map: grime, roughness: 0.55, metalness: 0.4 });
   const casting = new THREE.MeshStandardMaterial({ color: '#1a2d47', map: grime, roughness: 0.7, metalness: 0.45 });
-  const steel = new THREE.MeshStandardMaterial({ color: '#9aa3ad', map: grime, roughness: 0.42, metalness: 0.85 });
+  const steel = new THREE.MeshStandardMaterial({ color: '#7a828b', map: grime, roughness: 0.5, metalness: 0.8 });
   const rubber = new THREE.MeshStandardMaterial({ color: '#0d0f12', roughness: 0.85 });
   const hole = new THREE.MeshBasicMaterial({ color: '#07090c' });
   const plyTex = makePlywoodTexture();
