@@ -318,7 +318,7 @@ export function createStory(world) {
       const up = ease(seg(p, T.releaseA, T.releaseB));
       const sy = contPos.y + C.H + (1 - down) * 14 + up * 18;
       spreader.group.position.set(contPos.x, sy, contPos.z);
-      spreader.setTop(P.boomY - 2.4);
+      spreader.setTop(port.crane.ropeTop);
     }
     port.crane.trolley.position.x = spreadVis ? contPos.x : port.crane.trolley.position.x;
 

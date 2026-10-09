@@ -6,7 +6,7 @@
 // paintRe    — modeldagi kuzov materiali nomi (regex)
 // garage     — 1-slayddagi garajda turadimi
 // type       — katalog filtri: suv | sedan | van | ev
-// wheels     — ixtiyoriy: { r } g'ildirak radiusi (metr, standart 0.37) — src/three/wheels.js
+// wheels     — ixtiyoriy: { r } g'ildirak radiusi (metr; odatda shinadan avtomatik o'lchanadi) — src/three/wheels.js
 
 export const CARS = [
   {
@@ -31,7 +31,7 @@ export const CARS = [
     engine: { uz: '4.0 V8 Biturbo', ru: '4.0 V8 Biturbo' },
     color: { uz: 'Obsidian qora', ru: 'Чёрный обсидиан' },
     note: { uz: 'Night paket, AMG Driver\'s package', ru: 'Night пакет, AMG Driver\'s package' },
-    paint: 'obsidian', paintRe: /Paint_Material1$/, garage: true, wheels: { r: 0.385 },
+    paint: 'obsidian', paintRe: /Paint_Material1$/, garage: true,
   },
   {
     id: 'maybach', brand: 'Mercedes-Maybach', model: 'S 580', outline: 'MAYBACH',

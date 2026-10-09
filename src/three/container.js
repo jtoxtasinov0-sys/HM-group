@@ -1,8 +1,12 @@
 import * as THREE from 'three';
-import { makeContainerDecal, makeContainerDoorDecal } from './textures.js';
+import {
+  makeContainerDecal, makeContainerDoorDecal, makeWeatheredPaint, makeGrimeTexture, makePlywoodTexture, makeCscPlateTexture,
+} from './textures.js';
 
 // ISO 20ft konteyner (metr)
 export const C = { L: 6.058, W: 2.438, H: 2.591, floorY: 0.17 };
+
+const NAVY = '#1D3E69';
 
 /**
  * To'lqinsimon (gofrirovka) panel: profil X bo'ylab, balandlik Y bo'ylab, chuqurlik +Z.
@@ -37,75 +41,117 @@ function corrugated(length, height, { pitch = 0.278, depth = 0.036, flat = 0.075
   return g;
 }
 
+/** Gofra qirralarining UV o'rni — bo'yoq aynan shu joylarda yeyiladi */
+function ridgeU(length, { pitch = 0.278, flat = 0.075 } = {}) {
+  const slope = (pitch - 2 * flat) / 2;
+  const out = [];
+  for (let x = 0; x < length; x += pitch) out.push(x + flat, x + flat + slope, x + 2 * flat + slope, x + pitch);
+  return out.filter((v) => v < length).map((v) => v / length);
+}
+
 export function createContainer() {
   const { L, W, H } = C;
   const group = new THREE.Group();
   group.name = 'hm-container';
 
-  const paint = new THREE.MeshStandardMaterial({ color: '#1D3E69', roughness: 0.48, metalness: 0.42, side: THREE.DoubleSide });
-  const frame = new THREE.MeshStandardMaterial({ color: '#152f52', roughness: 0.5, metalness: 0.5 });
-  const steel = new THREE.MeshStandardMaterial({ color: '#c9d2dd', roughness: 0.3, metalness: 0.9 });
-  const casting = new THREE.MeshStandardMaterial({ color: '#0e2036', roughness: 0.6, metalness: 0.5 });
-  const floorMat = new THREE.MeshStandardMaterial({ color: '#2d3b4f', roughness: 0.75, metalness: 0.1 });
+  // ---------- materiallar ----------
+  const SIDE = { pitch: 0.278, depth: 0.036, flat: 0.075 };
+  const side = makeWeatheredPaint({ base: NAVY, w: 2048, h: 1024, seed: 5, ridges: ridgeU(L - 0.3, SIDE) });
+  const roofP = makeWeatheredPaint({ base: '#1b3a63', w: 1024, h: 512, seed: 6, streaks: 0.4, rust: 0.8, grime: 0 });
+  const endP = makeWeatheredPaint({ base: NAVY, w: 512, h: 512, seed: 7, ridges: ridgeU(W - 0.3, { pitch: 0.24, flat: 0.06 }) });
+  const doorP = makeWeatheredPaint({ base: NAVY, w: 512, h: 1024, seed: 8, ridges: ridgeU(W / 2 - 0.16, { pitch: 0.2, flat: 0.05 }), streaks: 1.2 });
+  const paintOf = (p) => new THREE.MeshStandardMaterial({ map: p.map, roughnessMap: p.roughnessMap, roughness: 1, metalness: 0.32 });
+  const paint = paintOf(side);
+  const roofMat = paintOf(roofP);
+  const endMat = paintOf(endP);
+  const doorMat = paintOf(doorP);
+  doorMat.side = THREE.DoubleSide;
+  // ichki devorlar — oddiyroq, och kulrang-ko'k bo'yoq
+  const inner = new THREE.MeshStandardMaterial({ color: '#4a5d75', roughness: 0.7, metalness: 0.2, side: THREE.BackSide });
+  const grime = makeGrimeTexture(9);
+  const frame = new THREE.MeshStandardMaterial({ color: '#1f3b62', map: grime, roughness: 0.55, metalness: 0.4 });
+  const casting = new THREE.MeshStandardMaterial({ color: '#1a2d47', map: grime, roughness: 0.7, metalness: 0.45 });
+  const steel = new THREE.MeshStandardMaterial({ color: '#9aa3ad', map: grime, roughness: 0.42, metalness: 0.85 });
+  const rubber = new THREE.MeshStandardMaterial({ color: '#0d0f12', roughness: 0.85 });
+  const hole = new THREE.MeshBasicMaterial({ color: '#07090c' });
+  const plyTex = makePlywoodTexture();
+  plyTex.repeat.set(1, 2);
+  const floorMat = new THREE.MeshStandardMaterial({ map: plyTex, roughness: 0.8, metalness: 0 });
 
   const box = (w, h, d, x, y, z, mat = frame, parent = group) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true;
     parent.add(m);
     return m;
   };
+  const panel = (geo, outMat, inMat, setup) => {
+    const a = new THREE.Mesh(geo, outMat); setup(a); a.castShadow = a.receiveShadow = true; group.add(a);
+    if (inMat) { const b = new THREE.Mesh(geo, inMat); setup(b); b.receiveShadow = true; group.add(b); }
+    return a;
+  };
 
-  // pastki va ustki relslar
+  // ---------- RAMA: pastki/ustki relslar, burchak ustunlari, quymalar ----------
   for (const s of [-1, 1]) {
     box(0.1, 0.16, L, s * (W / 2 - 0.05), 0.08, 0);
     box(0.1, 0.1, L, s * (W / 2 - 0.05), H - 0.05, 0);
+    // vilkali yuklagich cho'ntaklari (pastki relsdagi qora teshiklar)
+    for (const z of [-1.03, 1.03]) {
+      box(0.06, 0.12, 0.36, s * (W / 2 - 0.02), 0.075, z, casting);
+      box(0.02, 0.09, 0.3, s * (W / 2 + 0.012), 0.075, z, hole);
+    }
   }
   box(W, 0.16, 0.1, 0, 0.08, -L / 2 + 0.05);
   box(W, 0.12, 0.12, 0, H - 0.06, -L / 2 + 0.06);
-  // pol
-  box(W - 0.12, 0.03, L - 0.12, 0, 0.155, 0, floorMat);
-  // burchak ustunlari va quymalar
+  // pol (fanera) va ostidagi ko'ndalang to'sinlar
+  const floor = box(W - 0.12, 0.03, L - 0.12, 0, 0.155, 0, floorMat);
+  floor.castShadow = false;
+  for (let i = 0; i < 11; i++) box(W - 0.2, 0.09, 0.07, 0, 0.05, -L / 2 + 0.35 + i * ((L - 0.7) / 10), frame);
+  // burchak ustunlari va quymalar (ISO teshiklari bilan)
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     box(0.15, H, 0.15, sx * (W / 2 - 0.075), H / 2, sz * (L / 2 - 0.075));
-    for (const y of [0.09, H - 0.09]) box(0.18, 0.12, 0.18, sx * (W / 2 - 0.09), y, sz * (L / 2 - 0.09), casting);
+    for (const [y, sy] of [[0.059, -1], [H - 0.059, 1]]) {
+      const cx = sx * (W / 2 - 0.089), cz = sz * (L / 2 - 0.081);
+      box(0.178, 0.118, 0.162, cx, y, cz, casting);
+      // yon, uch va ust/ost tomonlardagi oval teshiklar
+      box(0.004, 0.05, 0.075, sx * (W / 2 + 0.001), y, cz, hole);
+      box(0.06, 0.05, 0.004, cx, y, sz * (L / 2 + 0.001), hole);
+      box(0.06, 0.004, 0.11, cx, y + sy * 0.0595, cz, hole);
+    }
   }
 
-  // yon devorlar (gofra)
-  const sideGeo = corrugated(L - 0.3, H - 0.27);
+  // ---------- YON DEVORLAR (gofra) ----------
+  const sideGeo = corrugated(L - 0.3, H - 0.27, SIDE);
   // brend yozuvi gofraning o'ziga "bo'yalgan" (xuddi shu geometriya, shaffof tekstura)
   const decalMat = new THREE.MeshStandardMaterial({
-    map: makeContainerDecal(), transparent: true, roughness: 0.5, metalness: 0.1,
+    map: makeContainerDecal(), transparent: true, roughness: 0.6, metalness: 0.05,
     depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
   });
   for (const s of [-1, 1]) {
-    const m = new THREE.Mesh(sideGeo, paint);
-    m.rotation.y = s * Math.PI / 2; // gofra tashqariga qaraydi
-    m.position.set(s * (W / 2 - 0.06), 0.16, 0);
-    group.add(m);
+    const setup = (m) => { m.rotation.y = s * Math.PI / 2; m.position.set(s * (W / 2 - 0.06), 0.16, 0); };
+    panel(sideGeo, paint, inner, setup);
     const d = new THREE.Mesh(sideGeo, decalMat);
-    d.rotation.copy(m.rotation);
-    d.position.copy(m.position);
+    setup(d);
     d.position.x += s * 0.001;
+    d.receiveShadow = true;
     group.add(d);
   }
   // old (yopiq) tomon
   const endGeo = corrugated(W - 0.3, H - 0.27, { pitch: 0.24, depth: 0.03, flat: 0.06 });
-  const endWall = new THREE.Mesh(endGeo, paint);
-  endWall.rotation.y = Math.PI;
-  endWall.position.set(0, 0.16, -L / 2 + 0.06);
-  group.add(endWall);
+  panel(endGeo, endMat, inner, (m) => { m.rotation.y = Math.PI; m.position.set(0, 0.16, -L / 2 + 0.06); });
   // tom: profil Z bo'ylab, kenglik X bo'ylab, gofra yuqoriga
   const roofGeo = corrugated(L - 0.2, W - 0.2, { pitch: 0.5, depth: 0.018, flat: 0.16 });
-  const roof = new THREE.Mesh(roofGeo, paint);
-  roof.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
-    new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0),
-  ));
-  roof.position.set(-(W - 0.2) / 2, H - 0.06, 0);
-  group.add(roof);
+  panel(roofGeo, roofMat, inner, (m) => {
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0),
+    ));
+    m.position.set(-(W - 0.2) / 2, H - 0.06, 0);
+  });
 
   // ichki yoritgich (yuklash paytida yonadi)
   const innerLightMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#e8f1ff') });
   const innerStrip = box(0.08, 0.03, L - 0.6, 0, H - 0.12, 0, innerLightMat);
+  innerStrip.castShadow = false;
   const innerLight = new THREE.PointLight('#dfeaff', 0, 7, 1.5);
   innerLight.position.set(0, H - 0.4, 0.4);
   group.add(innerLight);
@@ -117,7 +163,10 @@ export function createContainer() {
   box(W, 0.14, 0.14, 0, 0.07, L / 2 - 0.07);     // ostona
 
   const doorGeo = corrugated(doorW - 0.08, doorH - 0.12, { pitch: 0.2, depth: 0.025, flat: 0.05 });
-  const doorDecal = new THREE.MeshStandardMaterial({ map: makeContainerDoorDecal(), transparent: true, roughness: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const doorDecal = new THREE.MeshStandardMaterial({ map: makeContainerDoorDecal(), transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const cscMat = new THREE.MeshStandardMaterial({ map: makeCscPlateTexture(), roughness: 0.35, metalness: 0.7 });
+  // qulf tayoqlari tutqichlari ustki/pastki relsda (kulachok ushlagichlari)
+  const rodX = (side, k) => side * (W / 2 - 0.06) - side * doorW / 2 + (k - 0.5) * doorW;
 
   const makeDoor = (side) => {
     // side = -1 chap (ilgagi x=-W/2), +1 o'ng
@@ -126,36 +175,56 @@ export function createContainer() {
     const door = new THREE.Group();
     door.position.x = -side * doorW / 2;
     pivot.add(door);
-    const panel = new THREE.Mesh(doorGeo, paint);
-    panel.position.set(0, 0.06, -0.012);
-    door.add(panel);
-    // ramka
+    const leaf = new THREE.Mesh(doorGeo, doorMat);
+    leaf.position.set(0, 0.06, -0.012);
+    leaf.castShadow = leaf.receiveShadow = true;
+    door.add(leaf);
+    // ramka va rezina zichlagich
     box(doorW, 0.07, 0.06, 0, 0.035, 0.0, frame, door);
     box(doorW, 0.07, 0.06, 0, doorH - 0.035, 0.0, frame, door);
     box(0.06, doorH, 0.06, -doorW / 2 + 0.03, doorH / 2, 0, frame, door);
     box(0.06, doorH, 0.06, doorW / 2 - 0.03, doorH / 2, 0, frame, door);
-    // qulf tayoqlari
+    box(0.025, doorH - 0.02, 0.03, -side * (doorW / 2 + 0.006), doorH / 2, -0.01, rubber, door);
+    // qulf tayoqlari: ikkitadan, kulachoklar, yo'naltiruvchilar, yotqizilgan dastaklar
     for (const k of [0.27, 0.73]) {
       const bx = (k - 0.5) * doorW;
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, doorH + 0.05, 10), steel);
-      rod.position.set(bx, doorH / 2, 0.06);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, doorH + 0.1, 12), steel);
+      rod.position.set(bx, doorH / 2, 0.065);
+      rod.castShadow = true;
       door.add(rod);
-      const handle = box(0.035, 0.035, 0.32, bx + 0.0, doorH * 0.45, 0.2, steel, door);
-      handle.rotation.y = 0;
-      for (const y of [0.25, doorH - 0.25]) box(0.08, 0.06, 0.06, bx, y, 0.05, steel, door);
+      for (const y of [-0.02, doorH + 0.02]) box(0.07, 0.07, 0.07, bx, y, 0.065, steel, door);         // kulachok
+      for (const y of [0.35, doorH * 0.5, doorH - 0.35]) box(0.075, 0.05, 0.05, bx, y, 0.045, steel, door); // yo'naltiruvchi
+      // dastak: eshikka yotqizilgan, uchi ushlagichga kiradi
+      box(0.03, 0.03, 0.06, bx, doorH * 0.42, 0.09, steel, door);
+      box(0.3, 0.028, 0.028, bx + 0.15, doorH * 0.42, 0.105, steel, door);
+      box(0.05, 0.08, 0.04, bx + 0.29, doorH * 0.42, 0.075, steel, door);
     }
-    // ilgaklar
-    for (const y of [0.3, doorH * 0.5, doorH - 0.3]) box(0.05, 0.12, 0.07, side * (doorW / 2 - 0.02), y, 0.03, steel, door);
+    // ilgaklar (4 ta) — tashqi chetda
+    for (const y of [0.25, doorH * 0.36, doorH * 0.64, doorH - 0.25]) {
+      box(0.1, 0.13, 0.07, side * (doorW / 2 - 0.02), y, 0.035, steel, door);
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 10), steel);
+      pin.position.set(side * (doorW / 2 + 0.035), y, 0.03);
+      door.add(pin);
+    }
     if (side > 0) {
       const d = new THREE.Mesh(new THREE.PlaneGeometry(doorW * 0.9, doorW * 0.9), doorDecal);
       d.position.set(0, doorH * 0.62, 0.031);
       door.add(d);
+    } else {
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.15), cscMat);
+      plate.position.set(0, doorH * 0.3, 0.032);
+      door.add(plate);
     }
     group.add(pivot);
     return pivot;
   };
   const doorL = makeDoor(-1);
   const doorR = makeDoor(1);
+  // kulachok ushlagichlari (sarlavha va ostonada)
+  for (const side of [-1, 1]) for (const k of [0.27, 0.73]) {
+    box(0.1, 0.06, 0.09, rodX(side, k), H - 0.2, L / 2 + 0.02, steel);
+    box(0.1, 0.06, 0.09, rodX(side, k), 0.15, L / 2 + 0.02, steel);
+  }
 
   /** t: 0 — yopiq, 1 — to'liq ochiq (yon devorlarga yotadi) */
   const setDoors = (tl, tr = tl) => {
@@ -176,30 +245,34 @@ export function createContainer() {
 /** Kran "spreader"i va trosslar */
 export function createSpreader() {
   const group = new THREE.Group();
-  const white = new THREE.MeshStandardMaterial({ color: '#e9eef5', roughness: 0.45, metalness: 0.5 });
-  const navy = new THREE.MeshStandardMaterial({ color: '#1D3E69', roughness: 0.5, metalness: 0.5 });
-  const cableMat = new THREE.MeshStandardMaterial({ color: '#2a3442', roughness: 0.4, metalness: 0.8 });
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, C.L - 0.2), white);
-  beam.position.y = 0.36;
-  group.add(beam);
+  const grime = makeGrimeTexture(19);
+  const yellow = new THREE.MeshStandardMaterial({ color: '#dcae22', map: grime, roughness: 0.5, metalness: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#2b323b', map: grime, roughness: 0.5, metalness: 0.6 });
+  const cableMat = new THREE.MeshStandardMaterial({ color: '#23282f', roughness: 0.35, metalness: 0.85 });
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; group.add(m); return m; };
+  // asosiy ramka (sariq — haqiqiy spreaderlar kabi), teleskopik uchlar
+  add(new THREE.BoxGeometry(0.55, 0.36, C.L - 0.6), yellow, 0, 0.38, 0);
   for (const s of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(C.W - 0.1, 0.22, 0.32), navy);
-    arm.position.set(0, 0.2, s * (C.L / 2 - 0.25));
-    group.add(arm);
+    add(new THREE.BoxGeometry(C.W - 0.1, 0.24, 0.34), yellow, 0, 0.2, s * (C.L / 2 - 0.25));
+    add(new THREE.BoxGeometry(0.4, 0.3, 0.9), dark, 0, 0.38, s * (C.L / 2 - 0.9));
+    for (const sx of [-1, 1]) {
+      add(new THREE.BoxGeometry(0.2, 0.3, 0.2), dark, sx * (C.W / 2 - 0.1), 0.1, s * (C.L / 2 - 0.12)); // twistlock
+      add(new THREE.BoxGeometry(0.06, 0.6, 0.5), yellow, sx * (C.W / 2 + 0.02), -0.05, s * (C.L / 2 - 0.4)); // flipper
+    }
   }
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 2.2), white);
-  head.position.y = 0.72;
-  group.add(head);
+  add(new THREE.BoxGeometry(1.5, 0.55, 2.3), yellow, 0, 0.75, 0);
+  add(new THREE.BoxGeometry(1.0, 0.25, 1.6), dark, 0, 1.12, 0);
   const cables = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 6), cableMat);
-    c.userData.off = new THREE.Vector3(sx * 0.5, 0.95, sz * 0.9);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), cableMat);
+    c.userData.off = new THREE.Vector3(sx * 0.5, 1.2, sz * 0.9);
+    c.castShadow = true;
     cables.push(c);
     group.add(c);
   }
   /** trosslar uzunligi — tepadagi trolleygacha (dunyo Y koordinatasida) */
   const setTop = (worldTopY) => {
-    const len = Math.max(0.1, worldTopY - group.position.y - 0.95);
+    const len = Math.max(0.1, worldTopY - group.position.y - 1.2);
     for (const c of cables) {
       c.scale.y = len;
       c.position.set(c.userData.off.x, c.userData.off.y + len / 2, c.userData.off.z);

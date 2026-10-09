@@ -3,16 +3,89 @@ import * as THREE from 'three';
 const CALIPER_RE = /calip/i;
 
 /**
+ * Shinalarni geometriyadan o'lchaydi: yerga tegib turgan vertekslardan boshlab, ular bilan
+ * bog'langan butun bo'lak (shina) topiladi va uning chegaralari olinadi. Shina pastda biroz
+ * "yassilangan" bo'lishi mumkin, shuning uchun radius uzunlik bo'yicha (z), markaz esa tepadan
+ * o'lchanadi. Markaz noto'g'ri bo'lsa g'ildirak boshqa nuqta atrofida aylanib, kuzovdan "chiqib ketadi".
+ * Qaytaradi: har chorak uchun { R, cy, zc, x0, x1 } yoki null.
+ */
+function measureTires(items, quad, minY) {
+  const box = Array.from({ length: 4 }, () => ({ x0: Infinity, x1: -Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity, n: 0 }));
+  for (const { mesh, pos } of items) {
+    const index = mesh.geometry.index?.array;
+    if (!index) continue;
+    const n = pos.length / 3;
+    let seeded = false;
+    for (let i = 1; i < pos.length; i += 3) if (pos[i] < minY + 0.004) { seeded = true; break; }
+    if (!seeded) continue;
+
+    // bir xil joydagi vertekslarni birlashtiramiz (UV/normal choklari bo'linib ketmasin)
+    const ids = new Map();
+    const wid = new Int32Array(n);
+    const rep = [];
+    for (let i = 0; i < n; i++) {
+      const k = ((Math.round(pos[i * 3] * 2000) + 8192) * 16384 + (Math.round(pos[i * 3 + 1] * 2000) + 8192)) * 16384 + (Math.round(pos[i * 3 + 2] * 2000) + 8192);
+      let id = ids.get(k);
+      if (id === undefined) { id = rep.length; ids.set(k, id); rep.push(i); }
+      wid[i] = id;
+    }
+    const W = rep.length;
+    // verteks → uchburchaklar (CSR)
+    const start = new Int32Array(W + 1);
+    for (let t = 0; t < index.length; t++) start[wid[index[t]] + 1]++;
+    for (let i = 0; i < W; i++) start[i + 1] += start[i];
+    const fill = start.slice(0, W);
+    const tris = new Int32Array(index.length);
+    for (let t = 0; t < index.length; t++) tris[fill[wid[index[t]]]++] = (t / 3) | 0;
+
+    const seen = new Uint8Array(W);
+    for (let q = 0; q < 4; q++) {
+      const stack = [];
+      for (let v = 0; v < W; v++) {
+        const i = rep[v];
+        if (pos[i * 3 + 1] < minY + 0.004 && quad(pos[i * 3], pos[i * 3 + 2]) === q && !seen[v]) { seen[v] = 1; stack.push(v); }
+      }
+      const b = box[q];
+      while (stack.length) {
+        const v = stack.pop();
+        const i = rep[v];
+        const x = Math.abs(pos[i * 3]), y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+        b.x0 = Math.min(b.x0, x); b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
+        b.z0 = Math.min(b.z0, z); b.z1 = Math.max(b.z1, z); b.n++;
+        for (let k = start[v]; k < start[v + 1]; k++) {
+          const t = tris[k] * 3;
+          for (let j = 0; j < 3; j++) {
+            const u = wid[index[t + j]];
+            if (seen[u]) continue;
+            const ii = rep[u];
+            if (pos[ii * 3 + 1] > minY + 1.0 || quad(pos[ii * 3], pos[ii * 3 + 2]) !== q) continue;
+            seen[u] = 1;
+            stack.push(u);
+          }
+        }
+      }
+    }
+  }
+  return box.map((b) => {
+    const R = (b.z1 - b.z0) / 2;
+    const h = b.y1 - minY;
+    // shinaga o'xshamasa (kuzovga "oqib" ketgan bo'lsa) — ishonmaymiz
+    if (!(b.n > 50 && R > 0.25 && R < 0.5 && Math.abs(h - 2 * R) < 0.05)) return null;
+    return { R, cy: b.y1 - R, zc: (b.z0 + b.z1) / 2, x0: b.x0, x1: b.x1 };
+  });
+}
+
+/**
  * G'ildiraklarni modeldan ajratib, aylanadigan qiladi.
  * Optimizatsiyada barcha detallar materiallar bo'yicha birlashtirilgan, shuning uchun
  * g'ildiraklar geometriya bo'yicha topiladi: shinaning yerga tegib turgan joyi o'qni beradi,
  * shu o'q atrofidagi silindr ichidagi uchburchaklar alohida meshga ko'chiriladi.
  *
- * opt.r — g'ildirak radiusi (metr), opt.inset — silindrni ichkariga qancha cho'zish (disk/tormoz uchun)
+ * opt.r — g'ildirak radiusi (metr; berilmasa geometriyadan o'lchanadi),
+ * opt.inset — silindrni ichkariga qancha cho'zish (disk/tormoz uchun)
  * Qaytaradi: { wheels, radius, roll(masofa), steer(burchak) }
  */
 export function rigWheels(model, opt = {}) {
-  const r = opt.r || 0.37;
   const inset = opt.inset ?? 0.05;
   model.updateMatrixWorld(true);
   const toModel = new THREE.Matrix4().copy(model.matrixWorld).invert();
@@ -46,17 +119,21 @@ export function rigWheels(model, opt = {}) {
       a.x0 = Math.min(a.x0, ax); a.x1 = Math.max(a.x1, ax);
     }
   }
+  const tires = opt.r ? [] : measureTires(items, quad, minY);
   const wheels = acc.map((a, q) => {
     const sx = q % 2 ? 1 : -1;
     const front = q >= 2;
-    const z = opt[front ? 'f' : 'b'] ?? (a.z0 + a.z1) / 2;
+    const t = tires[q];
+    const r = opt.r || t?.R || 0.37;
+    const z = opt[front ? 'f' : 'b'] ?? t?.zc ?? (a.z0 + a.z1) / 2;
     return {
-      front, sx,
-      center: new THREE.Vector3(sx * (a.x0 + a.x1) / 2, minY + r, z),
-      xIn: a.x0 - inset, xOut: a.x1 + 0.03,
+      front, sx, r,
+      center: new THREE.Vector3(sx * (a.x0 + a.x1) / 2, t ? t.cy : minY + r, z),
+      xIn: Math.min(a.x0, t?.x0 ?? a.x0) - inset, xOut: Math.max(a.x1 + 0.03, (t?.x1 ?? 0) + 0.01),
       steer: new THREE.Object3D(), spin: new THREE.Object3D(),
     };
   });
+  const r = wheels.reduce((s, w) => s + w.r, 0) / 4;
   // kuzov alohida guruhda — tormoz/burilishda g'ildiraklarga nisbatan og'adi (podveska)
   const body = new THREE.Group();
   body.name = 'body';
@@ -69,8 +146,7 @@ export function rigWheels(model, opt = {}) {
   }
   model.updateMatrixWorld(true);
 
-  // 3) silindr ichidagi uchburchaklarni ko'chirish
-  const r2 = (r + 0.006) * (r + 0.006);
+  // 3) silindr ichidagi uchburchaklarni ko'chirish (butun shina, protektor bilan)
   const stats = { spin: 0, steer: 0 };
   for (const { mesh, pos } of items) {
     const geo = mesh.geometry;
@@ -83,7 +159,8 @@ export function rigWheels(model, opt = {}) {
       const ax = Math.abs(x);
       if (ax < w.xIn || ax > w.xOut) continue;
       const dy = y - w.center.y, dz = z - w.center.z;
-      if (dy * dy + dz * dz > r2) continue;
+      const rr = w.r + 0.012;
+      if (dy * dy + dz * dz > rr * rr) continue;
       tag[i] = quad(x, z);
       any = true;
     }
@@ -124,7 +201,7 @@ export function rigWheels(model, opt = {}) {
     else mesh.removeFromParent();
   }
 
-  let angle = 0;
+  let travel = 0;
   return {
     wheels,
     body,
@@ -134,8 +211,8 @@ export function rigWheels(model, opt = {}) {
     stats,
     /** masofa (metr) — oldinga musbat */
     roll(dist) {
-      angle += dist / r;
-      for (const w of wheels) w.spin.rotation.x = angle;
+      travel += dist;
+      for (const w of wheels) w.spin.rotation.x = travel / w.r;
     },
     /** old g'ildiraklar burilishi (radian, musbat — chapga) */
     steer(a) {

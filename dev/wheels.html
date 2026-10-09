@@ -37,14 +37,14 @@ for (let k = 0; k < ids.length; k++) {
   rigs.push(rig);
   for (const w of rig.wheels) {
     const ring = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, i) => new THREE.Vector3(0, Math.sin(i / 64 * Math.PI * 2) * rig.radius, Math.cos(i / 64 * Math.PI * 2) * rig.radius))),
+      new THREE.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, i) => new THREE.Vector3(0, Math.sin(i / 64 * Math.PI * 2) * w.r, Math.cos(i / 64 * Math.PI * 2) * w.r))),
       new THREE.LineBasicMaterial({ color: '#ff0040', depthTest: false }),
     );
     ring.position.copy(w.steer.position);
     ring.position.x = Math.sign(w.steer.position.x) * 1.3;
     model.add(ring);
   }
-  lines.push(`${car.id}: r=${rig.radius.toFixed(3)} axles ${rig.wheels.map((w) => w.steer.position.z.toFixed(2)).join(',')} spinTris=${rig.stats.spin} steerTris=${rig.stats.steer}`);
+  lines.push(`${car.id}: r=${rig.wheels.map((w) => w.r.toFixed(3)).join('/')} axles ${rig.wheels.map((w) => w.steer.position.z.toFixed(2)).join(',')} spinTris=${rig.stats.spin} steerTris=${rig.stats.steer}`);
 }
 document.getElementById('log').textContent = lines.join('\n');
 const one = ids.length === 1;

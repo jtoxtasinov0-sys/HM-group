@@ -7,10 +7,11 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
-import { createGarageEnv, createSkyEnv, makeSkyUniforms } from './env.js';
+import { createGarageEnv } from './env.js';
+import { createSkyEnvMap } from './sky.js';
 import { createGarage, G } from './garage.js';
 import { createContainer, createSpreader } from './container.js';
-import { createPort, duotoneMaterial } from './port.js';
+import { createPort, prepareShip } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
 import { createStory, GARAGE_FOG } from './story.js';
@@ -42,6 +43,7 @@ export function detectQuality() {
     reflections: !mobile,
     reflectionRes: 0.5,
     msaa: mobile ? 0 : 4,
+    shadows: !mobile,
     bloom: true,
   };
 }
@@ -81,6 +83,8 @@ export class World {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = quality.shadows;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer = renderer;
 
     const scene = new THREE.Scene();
@@ -94,14 +98,14 @@ export class World {
 
     // muhit xaritalari
     this.envGarage = createGarageEnv(renderer);
-    this.skyUniforms = makeSkyUniforms();
-    this.envSky = createSkyEnv(renderer, this.skyUniforms);
     scene.environment = this.envGarage;
 
     // dunyolar
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
-    this.port = createPort({ skyUniforms: this.skyUniforms });
+    this.port = createPort({ quality });
+    this.skyUniforms = this.port.sky.uniforms;
+    this.envSky = createSkyEnvMap(renderer, this.port.sky);
     this.port.group.visible = false;
     scene.add(this.port.group);
 
@@ -200,12 +204,7 @@ export class World {
     // kema — fon rejimida
     this.shipPromise = load('ship').then((g) => {
       const ship = g.scene;
-      ship.traverse((o) => {
-        if (!o.isMesh) return;
-        const m = o.material;
-        m.envMapIntensity = 0.8;
-        duotoneMaterial(m);
-      });
+      prepareShip(ship);
       ship.rotation.y = Math.PI; // burni +Z tomonga (suzish yo'nalishi)
       this.port.shipHolder.add(ship);
       this.ship = ship;
@@ -293,7 +292,7 @@ export class World {
 
     this.story.update(this.p, dt, this.time);
     this.grade.uniforms.uTime.value = this.time;
-    this.port.update(this.time, this.camera);
+    this.port.update(this.time, this.camera, this.container.group.position);
     this.composer.render();
     this.emit('frame', this.p);
   }

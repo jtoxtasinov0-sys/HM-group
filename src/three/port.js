@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { SKY_GLSL, makeSkyMaterial } from './env.js';
-import { makeGroundTexture } from './textures.js';
+import { createSky } from './sky.js';
+import { createOcean } from './ocean.js';
+import { createCrane, bucket } from './crane.js';
+import { makeConcreteTextures, makeStackTextures, makeGrimeTexture, rand } from './textures.js';
 import { C } from './container.js';
 import { G } from './garage.js';
 
@@ -14,112 +16,36 @@ export const P = {
   craneLegX: [-12, 10], // quruqlik / suv tomondagi oyoqlar
   craneHalfGauge: 11,
   boomY: 41,
+  // quyosh: kema suzib ketadigan tomonda (+z), ufqdan ~11° — "oltin soat" yorug'i
+  sunDir: new THREE.Vector3(-0.2, 0.19, 0.96).normalize(),
 };
 
-const BRAND_STACK = ['#1D3E69', '#16335D', '#EEF2F8', '#d5deea', '#8ea3bc', '#2c5288', '#f7f9fc'];
+// Haqiqiy konteyner liniyalari ranglariga yaqin (biroz eskirgan), HM navy ko'proq
+const STACK_COLORS = [
+  '#1D3E69', '#1D3E69', '#1D3E69', '#3d7aa6', '#c4ac74', '#2f6a4b', '#22407e', '#bf6130',
+  '#8a3038', '#9ea4aa', '#d6d6d1', '#6a4a3b', '#a8372d', '#6e3266', '#2b5d8a', '#d9d4c7',
+];
 
-/** Kema materiallarini brend duotoniga o'tkazish: navy → oq */
-export function duotoneMaterial(mat, dark = '#183a66', light = '#f3f6fa') {
-  const uDark = { value: new THREE.Color(dark) };
-  const uLight = { value: new THREE.Color(light) };
-  mat.onBeforeCompile = (s) => {
-    s.uniforms.uDark = uDark;
-    s.uniforms.uLight = uLight;
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uDark;\nuniform vec3 uLight;')
-      .replace('#include <map_fragment>', `#include <map_fragment>
+/** Kema materiallari: haqiqiy ranglar (biroz so'ndirilgan — o'yinchoq ko'rinmasin), soyalar */
+export function prepareShip(ship) {
+  ship.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    const m = o.material;
+    m.envMapIntensity = 1;
+    if (m.metalness > 0.5) m.metalness = 0.4; // bo'yalgan po'lat
+    m.onBeforeCompile = (s) => {
+      s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
         float hmL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-        diffuseColor.rgb = mix(uDark, uLight, smoothstep(0.03, 0.62, hmL));`);
-  };
-  mat.customProgramCacheKey = () => 'duotone';
-  mat.needsUpdate = true;
-}
-
-function makeOcean(skyUniforms) {
-  const uniforms = THREE.UniformsUtils.merge([
-    THREE.UniformsLib.fog,
-    {
-      uTime: { value: 0 },
-      uDeep: { value: new THREE.Color('#0b2c52') },
-      uShallow: { value: new THREE.Color('#1f5d8f') },
-    },
-  ]);
-  // osmon uniformlarini umumiy ob'ekt orqali ulaymiz (ranglar sinxron bo'lsin)
-  for (const k of ['uZenith', 'uHorizon', 'uGround', 'uSunDir', 'uSunColor']) uniforms[k] = skyUniforms[k];
-
-  const mat = new THREE.ShaderMaterial({
-    uniforms,
-    fog: true,
-    vertexShader: /* glsl */`
-      #include <common>
-      #include <fog_pars_vertex>
-      varying vec3 vWorld;
-      void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vWorld = wp.xyz;
-        vec4 mvPosition = viewMatrix * wp;
-        gl_Position = projectionMatrix * mvPosition;
-        #include <fog_vertex>
-      }`,
-    fragmentShader: /* glsl */`
-      #include <common>
-      #include <fog_pars_fragment>
-      uniform float uTime;
-      uniform vec3 uDeep;
-      uniform vec3 uShallow;
-      varying vec3 vWorld;
-      ${SKY_GLSL}
-
-      // yo'naltirilgan to'lqinlar yig'indisi — qiyalik (gradient) qaytaradi
-      // fade: uzoqda yuqori chastotalar o'chadi (aliasing bo'lmasin)
-      vec2 waves(vec2 p, float t, float dist) {
-        vec2 g = vec2(0.0);
-        float k = 0.045;
-        float a = 0.32;
-        float ang = 0.35;
-        for (int i = 0; i < 11; i++) {
-          vec2 d = vec2(cos(ang), sin(ang));
-          float ph = dot(d, p) * k + t * sqrt(9.8 * k) + float(i) * 1.7;
-          float lambda = 6.2831 / k;
-          float fade = 1.0 - smoothstep(lambda * 18.0, lambda * 60.0, dist);
-          g += d * k * a * cos(ph) * fade;
-          k *= 1.47;
-          a *= 0.62;
-          ang += 2.39996; // oltin burchak — yo'nalishlar tarqoq
-        }
-        return g;
-      }
-      void main() {
-        vec2 p = vWorld.xz;
-        float dist = length(cameraPosition - vWorld);
-        vec2 g = waves(p, uTime, dist) * 1.6;
-        vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
-
-        vec3 V = normalize(cameraPosition - vWorld);
-        vec3 R = reflect(-V, N);
-        R.y = abs(R.y);
-        float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
-        vec3 sky = skyColor(R);
-        // to'lqin cho'qqilarida biroz yorqinroq (subsurface)
-        float crest = clamp(0.5 + (g.x + g.y) * 2.5, 0.0, 1.0);
-        vec3 water = mix(uDeep, uShallow, crest * 0.5);
-        vec3 col = mix(water, sky, fres);
-        // quyosh yaltirashi
-        vec3 H = normalize(normalize(uSunDir) + V);
-        float spec = pow(max(dot(N, H), 0.0), 260.0) * 5.0 + pow(max(dot(N, H), 0.0), 40.0) * 0.12;
-        col += uSunColor * spec;
-        gl_FragColor = vec4(col, 1.0);
-        #include <fog_fragment>
-      }`,
+        diffuseColor.rgb = mix(vec3(hmL), diffuseColor.rgb, 0.7) * 0.92;`);
+    };
+    m.customProgramCacheKey = () => 'ship-real';
+    m.needsUpdate = true;
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000, 1, 1), mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = P.waterY;
-  mesh.frustumCulled = false;
-  return { mesh, uniforms };
 }
 
-/** Ko'pik — kema atrofida va orqasida */
+/** Ko'pik — kema orqasida (Kelvin izi) */
 function makeWake() {
   const uniforms = { uTime: { value: 0 }, uSpeed: { value: 0 } };
   const mat = new THREE.ShaderMaterial({
@@ -135,7 +61,7 @@ function makeWake() {
       float hash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
       float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
         return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
-      float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+      float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
       void main() {
         // y: 0 — kema dumi, 1 — iz oxiri; x: -1..1 kenglik bo'ylab
         float y = vUv.y;
@@ -143,14 +69,12 @@ function makeWake() {
         float ax = abs(x);
         vec2 q = vec2(x * 9.0, y * 60.0 + uTime * 0.35);
         float n = fbm(q);
-        // markaziy ko'pik yo'li
         float w = 0.05 + 0.16 * pow(y, 0.7);
         float core = (1.0 - smoothstep(w * 0.4, w, ax)) * pow(1.0 - y, 1.6);
-        // Kelvin "V" qanotlari
         float arm = 0.07 + 0.85 * y;
         float wing = exp(-pow((ax - arm) / (0.012 + 0.03 * y), 2.0)) * pow(1.0 - y, 2.2) * 0.7;
         float a = (core * smoothstep(0.35, 0.75, n + 0.15) + wing * smoothstep(0.3, 0.7, n)) * smoothstep(0.0, 0.015, y);
-        gl_FragColor = vec4(vec3(0.96, 0.98, 1.0), a * uSpeed * 0.85);
+        gl_FragColor = vec4(vec3(0.92, 0.95, 0.97), a * uSpeed * 0.8);
       }`,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(130, 420, 1, 1), mat);
@@ -159,166 +83,176 @@ function makeWake() {
   return { mesh, uniforms };
 }
 
-function makeCrane() {
+/** Prichal: beton maydon, chet (koping), rezina amortizatorlar, bollardlar, kran relslari, chiziqlar */
+function makeQuay(quality) {
   const g = new THREE.Group();
-  const white = new THREE.MeshStandardMaterial({ color: '#eef2f8', roughness: 0.5, metalness: 0.35 });
-  const navy = new THREE.MeshStandardMaterial({ color: '#1D3E69', roughness: 0.5, metalness: 0.4 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#273445', roughness: 0.6, metalness: 0.5 });
-  const box = (w, h, d, x, y, z, m = white) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
-  const zc = G.container.z;
-  const [lx, wx] = P.craneLegX;
-  const legH = 36;
-  for (const x of [lx, wx]) for (const s of [-1, 1]) {
-    box(1.3, legH, 1.3, x, legH / 2, zc + s * P.craneHalfGauge);
-    box(1.8, 1.4, 3.2, x, 0.7, zc + s * P.craneHalfGauge, navy); // g'ildirak aravasi
-  }
-  for (const x of [lx, wx]) {
-    box(1.4, 1.6, P.craneHalfGauge * 2 + 1.3, x, legH, zc, navy);   // portal to'sin
-    box(1.0, 1.0, P.craneHalfGauge * 2, x, 12, zc);                 // pastki to'sin
-  }
-  for (const s of [-1, 1]) {
-    box(wx - lx, 1.4, 1.4, (lx + wx) / 2, legH, zc + s * P.craneHalfGauge, navy);
-    // diagonal bog'lovchilar
-    const diag = box(0.5, Math.hypot(wx - lx, legH - 12), 0.5, (lx + wx) / 2, (legH + 12) / 2, zc + s * P.craneHalfGauge, white);
-    diag.rotation.z = Math.atan2(wx - lx, legH - 12);
-  }
-  // strela (boom) — ikki parallel to'sin
-  const boomFrom = -34, boomTo = 62;
-  for (const s of [-1, 1]) box(boomTo - boomFrom, 2.2, 1.0, (boomFrom + boomTo) / 2, P.boomY, zc + s * 2.4);
-  for (let x = boomFrom + 3; x < boomTo; x += 6) box(0.4, 0.4, 4.8, x, P.boomY - 1.0, zc, dark);
-  // mashina xonasi
-  box(9, 4, 6.5, boomFrom + 7, P.boomY + 3, zc, white);
-  box(9.2, 0.6, 6.7, boomFrom + 7, P.boomY + 5.2, zc, navy);
-  // A-ramka va tortqilar
-  const apexX = (lx + wx) / 2, apexY = P.boomY + 18;
-  for (const s of [-1, 1]) {
-    for (const x of [lx + 2, wx - 2]) {
-      const len = Math.hypot(apexX - x, apexY - P.boomY);
-      const leg = box(0.9, len, 0.9, (apexX + x) / 2, (apexY + P.boomY) / 2, zc + s * 2.4);
-      leg.rotation.z = -Math.atan2(apexX - x, apexY - P.boomY);
-    }
-    for (const tx of [boomTo - 2, boomTo - 26, boomFrom + 2]) {
-      const len = Math.hypot(tx - apexX, apexY - P.boomY);
-      const tie = box(0.18, len, 0.18, (apexX + tx) / 2, (apexY + P.boomY) / 2, zc + s * 2.4, dark);
-      tie.rotation.z = Math.atan2(apexX - tx, apexY - P.boomY);
-    }
-  }
-  box(1.6, 1.0, 6.2, apexX, apexY, zc, navy);
-  // kabina
-  const cab = box(2.4, 2.4, 2.4, 0, P.boomY - 2.6, zc - 3.5, white);
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(2.46, 1.2, 2.46), new THREE.MeshStandardMaterial({ color: '#0f2440', roughness: 0.1, metalness: 0.8 }));
-  glass.position.set(0, 0.2, 0); cab.add(glass);
-  // trolley
-  const trolley = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.6, 5.4), navy);
-  trolley.position.set(0, P.boomY - 1.6, zc);
-  g.add(trolley);
-  // ogohlantirish chiroqlari
-  const redMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(4) });
-  for (const x of [boomTo - 0.5, apexX]) {
-    const l = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), redMat);
-    l.position.set(x, x === apexX ? apexY + 0.8 : P.boomY + 1.4, zc);
-    g.add(l);
-  }
-  return { group: g, trolley, cab };
-}
-
-function makeQuay() {
-  const g = new THREE.Group();
-  const tex = makeGroundTexture();
-  tex.repeat.set(30, 120);
-  const top = new THREE.MeshStandardMaterial({ color: '#c3cedb', map: tex, roughness: 0.9 });
-  const side = new THREE.MeshStandardMaterial({ color: '#5d6f86', roughness: 0.85 });
-  const quay = new THREE.Mesh(new THREE.BoxGeometry(160, 8, 420), [side, side, top, side, side, side]);
-  quay.position.set(P.quayEdgeX - 80, -4, -70);
+  const ct = makeConcreteTextures({ seed: 33, tone: 158 });
+  const slab = 8; // bitta tekstura = 8 m plita
+  const QW = 160, QL = 420, QX = P.quayEdgeX - QW / 2, QZ = -70;
+  const topTex = (t) => { const c = t.clone(); c.repeat.set(QW / slab, QL / slab); c.needsUpdate = true; return c; };
+  const top = new THREE.MeshStandardMaterial({ map: topTex(ct.map), normalMap: topTex(ct.normalMap), roughnessMap: topTex(ct.roughnessMap), roughness: 1, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8) });
+  const faceTex = ct.map.clone(); faceTex.repeat.set(QL / slab, 1); faceTex.needsUpdate = true;
+  const side = new THREE.MeshStandardMaterial({ color: '#7f8790', map: faceTex, roughness: 0.95 });
+  const quay = new THREE.Mesh(new THREE.BoxGeometry(QW, 8, QL), [side, side, top, side, side, side]);
+  quay.position.set(QX, -4, QZ);
+  quay.receiveShadow = true;
   g.add(quay);
-  // chet chizig'i
-  const edge = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 420), new THREE.MeshStandardMaterial({ color: '#f4f7fb', roughness: 0.6 }));
-  edge.position.set(P.quayEdgeX - 1.2, 0.03, -70);
-  g.add(edge);
-  // bollardlar
-  const bMat = new THREE.MeshStandardMaterial({ color: '#1D3E69', roughness: 0.5, metalness: 0.5 });
-  const bollard = new THREE.CylinderGeometry(0.28, 0.35, 0.8, 12);
-  const inst = new THREE.InstancedMesh(bollard, bMat, 28);
-  const m = new THREE.Matrix4();
-  for (let i = 0; i < 28; i++) { m.makeTranslation(P.quayEdgeX - 0.8, 0.4, -275 + i * 15); inst.setMatrixAt(i, m); }
-  g.add(inst);
+  // suv chizig'idagi yashil-qora dog' (to'lqin izi)
+  const algae = new THREE.Mesh(new THREE.PlaneGeometry(QL, 1.6), new THREE.MeshStandardMaterial({ color: '#2b3a33', roughness: 0.9, transparent: true, opacity: 0.85 }));
+  algae.rotation.y = Math.PI / 2;
+  algae.position.set(P.quayEdgeX + 0.02, P.waterY + 0.5, QZ);
+  g.add(algae);
 
-  // konteyner steklari (brend ranglarida)
-  const ribCanvas = document.createElement('canvas');
-  ribCanvas.width = 256; ribCanvas.height = 64;
-  const ctx = ribCanvas.getContext('2d');
-  for (let x = 0; x < 256; x += 8) {
-    const gr = ctx.createLinearGradient(x, 0, x + 8, 0);
-    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, '#d9dde3'); gr.addColorStop(1, '#ffffff');
-    ctx.fillStyle = gr; ctx.fillRect(x, 0, 8, 64);
+  const B = { conc: bucket(), black: bucket(), navy: bucket(), steel: bucket(), yellow: bucket(), white: bucket() };
+  // chet (koping) — oq-sariq bo'yalgan
+  B.white.box(0.9, 0.3, QL, P.quayEdgeX - 0.45, 0.15, QZ);
+  for (let z = QZ - QL / 2; z < QZ + QL / 2; z += 6) B.yellow.box(0.92, 0.31, 3, P.quayEdgeX - 0.45, 0.15, z);
+  // rezina amortizatorlar (konus + panel) va bollardlar
+  for (let z = QZ - QL / 2 + 8; z < QZ + QL / 2; z += 16) {
+    B.black.cyl(0.85, 1.1, P.quayEdgeX + 0.55, -1.7, z, new THREE.Euler(0, 0, Math.PI / 2), 20);
+    B.black.box(0.35, 3.2, 3.6, P.quayEdgeX + 1.25, -1.7, z);
+    B.navy.cyl(0.26, 0.55, P.quayEdgeX - 1.6, 0.27, z + 5, null, 14);
+    B.navy.cyl(0.36, 0.14, P.quayEdgeX - 1.6, 0.6, z + 5, null, 14);
   }
-  const ribTex = new THREE.CanvasTexture(ribCanvas);
-  ribTex.colorSpace = THREE.SRGBColorSpace;
-  const boxGeo = new THREE.BoxGeometry(C.W, C.H, C.L * 2 + 0.1); // 40ft
-  const stackMat = new THREE.MeshStandardMaterial({ map: ribTex, roughness: 0.55, metalness: 0.3 });
-  const count = 1400;
+  // kran relslari
+  for (const x of P.craneLegX) {
+    B.steel.box(0.16, 0.08, QL, x, 0.04, QZ);
+    B.black.box(0.7, 0.012, QL, x, 0.006, QZ);
+  }
+  // yo'l chiziqlari
+  for (const x of [-4.5, 3.5]) B.yellow.box(0.15, 0.01, QL, x, 0.012, QZ);
+  for (const x of [-8, 0]) for (let z = QZ - QL / 2; z < QZ + QL / 2; z += 9) B.white.box(0.12, 0.01, 4.5, x, 0.012, z);
+  // kran ostidagi xavfli zona shtrixi
+  for (let i = -6; i <= 6; i++) B.yellow.box(0.25, 0.01, 2.6, -1 + i * 1.1, 0.013, G.container.z - P.craneHalfGauge - 2, new THREE.Euler(0, 0.6, 0));
+
+  const grime = makeGrimeTexture(17);
+  const mats = {
+    conc: new THREE.MeshStandardMaterial({ color: '#9aa1a8', map: grime, roughness: 0.9 }),
+    black: new THREE.MeshStandardMaterial({ color: '#15171a', roughness: 0.85 }),
+    navy: new THREE.MeshStandardMaterial({ color: '#1b2c42', map: grime, roughness: 0.6, metalness: 0.4 }),
+    steel: new THREE.MeshStandardMaterial({ color: '#7d858e', roughness: 0.35, metalness: 0.8 }),
+    yellow: new THREE.MeshStandardMaterial({ color: '#d9ac1f', map: grime, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2 }),
+    white: new THREE.MeshStandardMaterial({ color: '#e6e8ea', map: grime, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -2 }),
+  };
+  for (const [k, b] of Object.entries(B)) { const m = b.mesh(mats[k]); if (m) g.add(m); }
+
+  // ---------- konteyner steklari ----------
+  const st = makeStackTextures();
+  const boxGeo = new THREE.BoxGeometry(C.W, C.H, C.L * 2 + 0.1); // 40 fut
+  // uchlari va tomida qovurg'alar siyrakroq bo'lsin (UV qisqartiriladi)
+  const uv = boxGeo.attributes.uv;
+  for (let i = 8; i < 24; i++) uv.setX(i, uv.getX(i) * 0.2);
+  const stackMat = new THREE.MeshStandardMaterial({ map: st.map, normalMap: st.normalMap, roughnessMap: st.roughnessMap, roughness: 1, metalness: 0.35 });
+  const count = 1500;
   const stacks = new THREE.InstancedMesh(boxGeo, stackMat, count);
+  const m = new THREE.Matrix4();
   const col = new THREE.Color();
+  const r = rand(7);
   let n = 0;
-  const rand = mulberry(7);
   for (let row = 0; row < 14 && n < count; row++) {
     for (let bay = -21; bay < 10 && n < count; bay++) {
       const x = -24 - row * 3.1 - Math.floor(row / 2) * 2.5;
       const z = bay * 12.6;
       if (Math.abs(z - G.container.z) < 22 && row < 4) continue; // kran ostida bo'sh
-      const h = 1 + Math.floor(rand() * 4);
+      const h = 1 + Math.floor(r() * 4.4);
       for (let k = 0; k < h && n < count; k++) {
-        m.makeTranslation(x, C.H / 2 + k * C.H, z);
+        m.makeTranslation(x + (r() - 0.5) * 0.08, C.H / 2 + k * C.H, z + (r() - 0.5) * 0.25);
         stacks.setMatrixAt(n, m);
-        stacks.setColorAt(n, col.set(BRAND_STACK[Math.floor(rand() * BRAND_STACK.length)]));
+        col.set(STACK_COLORS[Math.floor(r() * STACK_COLORS.length)]).multiplyScalar(0.85 + r() * 0.2);
+        stacks.setColorAt(n, col);
         n++;
       }
     }
   }
   stacks.count = n;
+  stacks.castShadow = quality.shadows;
+  stacks.receiveShadow = true;
   g.add(stacks);
+
+  // ---------- RTG kranlari (steklar ustida) ----------
+  const R = { white: bucket(), yellow: bucket(), black: bucket(), steel: bucket() };
+  for (const [x0, z0] of [[-31, -60], [-55, 40], [-42, -150]]) {
+    const span = 23.5, hgt = 19, depth = 7;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      R.white.box(0.9, hgt, 0.9, x0 + sx * span / 2, hgt / 2 + 1.2, z0 + sz * depth / 2);
+      R.black.cyl(0.65, 0.5, x0 + sx * span / 2, 0.65, z0 + sz * depth / 2, new THREE.Euler(0, 0, Math.PI / 2), 18);
+    }
+    for (const sz of [-1, 1]) R.white.box(span + 1.2, 1.5, 1.1, x0, hgt + 1.2, z0 + sz * depth / 2);
+    for (const sx of [-1, 1]) R.white.box(1.2, 1.0, depth + 1, x0 + sx * span / 2, 3.2, z0);
+    R.yellow.box(4, 1.8, depth + 0.6, x0 + 3, hgt + 2.6, z0);
+    R.steel.box(1.6, 1.6, 2, x0 + span / 2 - 1, hgt - 1.5, z0 + depth / 2 + 0.8);
+  }
+  const rmats = {
+    white: new THREE.MeshStandardMaterial({ color: '#e8eaec', map: grime, roughness: 0.55, metalness: 0.2 }),
+    yellow: new THREE.MeshStandardMaterial({ color: '#dcae22', map: grime, roughness: 0.55 }),
+    black: mats.black, steel: mats.steel,
+  };
+  for (const [k, b] of Object.entries(R)) { const mm = b.mesh(rmats[k]); if (mm) g.add(mm); }
+
+  // ---------- baland chiroq ustunlari ----------
+  const L = bucket();
+  for (const [x, z] of [[-20, 30], [-20, -70], [-20, -170], [-68, -20], [-68, -120], [-4, 70]]) {
+    L.box(0.7, 34, 0.7, x, 17, z);
+    L.box(4.2, 0.4, 4.2, x, 34.2, z);
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2;
+      L.box(1.1, 0.7, 0.3, x + Math.cos(a) * 1.7, 33.6, z + Math.sin(a) * 1.7, new THREE.Euler(0.4, a, 0));
+    }
+  }
+  g.add(L.mesh(mats.steel));
+
   return g;
 }
 
-function mulberry(a) {
-  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
-
-export function createPort({ skyUniforms }) {
+export function createPort({ quality }) {
   const group = new THREE.Group();
   group.name = 'port';
 
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 24), makeSkyMaterial(skyUniforms));
-  sky.frustumCulled = false;
-  sky.renderOrder = -10;
-  group.add(sky);
+  const sky = createSky({ sunDir: P.sunDir, turbidity: 3.6, rayleigh: 1.6, mie: 0.0045, mieG: 0.84, clouds: 0.3, gain: 2.1 });
+  sky.groundColor = '#3b4a58';
+  group.add(sky.mesh);
 
-  const ocean = makeOcean(skyUniforms);
+  const ocean = createOcean({ sunDir: P.sunDir, y: P.waterY, reflectRes: quality.mobile ? 256 : 512 });
   group.add(ocean.mesh);
   const wake = makeWake();
   group.add(wake.mesh);
 
-  group.add(makeQuay());
-  const crane = makeCrane();
+  group.add(makeQuay(quality));
+  const crane = createCrane({ zc: G.container.z, legX: P.craneLegX, half: P.craneHalfGauge, boomY: P.boomY });
+  if (!quality.shadows) crane.group.traverse((o) => { o.castShadow = false; });
   group.add(crane.group);
 
-  const sun = new THREE.DirectionalLight('#fff8ee', 2.6);
-  sun.position.copy(skyUniforms.uSunDir.value).multiplyScalar(200);
-  group.add(sun);
-  group.add(new THREE.HemisphereLight('#cfe0f5', '#20344f', 1.1));
+  // quyosh (soya beradi) — soya kamerasi har kadrda harakat markaziga suriladi
+  const sun = new THREE.DirectionalLight('#ffe7c8', 3.4);
+  sun.castShadow = quality.shadows;
+  if (quality.shadows) {
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -55; sc.right = 55; sc.top = 55; sc.bottom = -55; sc.near = 1; sc.far = 420;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.05;
+    sun.shadow.radius = 2.5;
+  }
+  group.add(sun, sun.target);
+  group.add(new THREE.HemisphereLight('#bcd2ec', '#4b5561', 0.55));
 
   const shipHolder = new THREE.Group();
   shipHolder.position.set(P.shipX, P.waterY - P.shipDraftY, P.shipZ);
   group.add(shipHolder);
 
   return {
-    group, sky, ocean, wake, crane, shipHolder,
-    update(time, camera) {
-      ocean.uniforms.uTime.value = time;
+    group, sky, ocean, wake, crane, shipHolder, sun,
+    /** focus — soya kamerasining markazi (konteyner / kema) */
+    update(time, camera, focus) {
+      ocean.update(time);
       wake.uniforms.uTime.value = time;
       ocean.mesh.position.x = Math.round(camera.position.x / 50) * 50;
       ocean.mesh.position.z = Math.round(camera.position.z / 50) * 50;
-      sky.position.copy(camera.position);
+      sky.update(time, camera);
+      if (focus) {
+        sun.target.position.copy(focus);
+        sun.position.copy(focus).addScaledVector(P.sunDir, 220);
+      }
     },
   };
 }
