@@ -36,12 +36,14 @@ Tayyor sayt `dist/` papkasida bo'ladi.
 
 Saytni internetga joylash (asosiy manzil: **https://hmgroup-uz.vercel.app**):
 
+Vercel loyihasi GitHub'ga ulangan — `main` ga push qilinganda sayt avtomatik yig'iladi va yangilanadi
+(sozlamalar `vercel.json` da). Qo'lda joylash kerak bo'lsa:
+
 ```bash
 npm run deploy
 ```
 
 Bu saytni yig'adi va Vercel'dagi `hmgroup-uz` loyihasiga yuklaydi (bir marta `vercel login` kerak).
-Har o'zgarishdan keyin qayta ishga tushiring.
 
 Telegram, Instagram, WhatsApp'da havola rasm bilan chiqadi: rasm — `public/og.jpg` (1200×630),
 sarlavha va matn — `index.html` dagi `og:` teglari. Manzil o'zgarsa, `tools/deploy.mjs` dagi `PROJECT` ni o'zgartiring.
