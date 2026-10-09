@@ -56,11 +56,13 @@ export function createContainer() {
 
   // ---------- materiallar ----------
   const SIDE = { pitch: 0.278, depth: 0.036, flat: 0.075 };
-  const side = makeWeatheredPaint({ base: NAVY, w: 2048, h: 1024, seed: 5, ridges: ridgeU(L - 0.3, SIDE) });
-  const roofP = makeWeatheredPaint({ base: '#1b3a63', w: 1024, h: 512, seed: 6, streaks: 0.4, rust: 0.8, grime: 0 });
-  const endP = makeWeatheredPaint({ base: NAVY, w: 512, h: 512, seed: 7, ridges: ridgeU(W - 0.3, { pitch: 0.24, flat: 0.06 }) });
-  const doorP = makeWeatheredPaint({ base: NAVY, w: 512, h: 1024, seed: 8, ridges: ridgeU(W / 2 - 0.16, { pitch: 0.2, flat: 0.05 }), streaks: 1.2 });
-  const paintOf = (p) => new THREE.MeshStandardMaterial({ map: p.map, roughnessMap: p.roughnessMap, roughness: 1, metalness: 0.32 });
+  // deyarli yangi konteyner: nozik iflos va zang izlari (haddan tashqari eskirgan emas)
+  const wear = { streaks: 0.45, rust: 0.3, grime: 0.45 };
+  const side = makeWeatheredPaint({ base: NAVY, w: 2048, h: 1024, seed: 5, ridges: ridgeU(L - 0.3, SIDE), ...wear });
+  const roofP = makeWeatheredPaint({ base: '#1b3a63', w: 1024, h: 512, seed: 6, streaks: 0.3, rust: 0.3, grime: 0 });
+  const endP = makeWeatheredPaint({ base: NAVY, w: 512, h: 512, seed: 7, ridges: ridgeU(W - 0.3, { pitch: 0.24, flat: 0.06 }), ...wear });
+  const doorP = makeWeatheredPaint({ base: NAVY, w: 512, h: 1024, seed: 8, ridges: ridgeU(W / 2 - 0.16, { pitch: 0.2, flat: 0.05 }), ...wear });
+  const paintOf = (p) => new THREE.MeshStandardMaterial({ map: p.map, roughnessMap: p.roughnessMap, roughness: 1, metalness: 0.22 });
   const paint = paintOf(side);
   const roofMat = paintOf(roofP);
   const endMat = paintOf(endP);
@@ -232,8 +234,8 @@ export function createContainer() {
     doorR.rotation.y = tr * Math.PI * 0.94;
   };
   const setInnerLight = (k) => {
-    innerLight.intensity = k * 9;
-    innerLightMat.color.setRGB(0.91, 0.95, 1).multiplyScalar(0.3 + k * 4.5);
+    innerLight.intensity = k * 2.5;
+    innerLightMat.color.setRGB(0.91, 0.95, 1).multiplyScalar(0.3 + k * 2.2);
   };
   setDoors(1);
   setInnerLight(1);
@@ -242,40 +244,78 @@ export function createContainer() {
   return { group, setDoors, setInnerLight, innerStrip };
 }
 
-/** Kran "spreader"i va trosslar */
+/** Qora-sariq xavf chiziqlari (spreader chetlari uchun) */
+function hazardTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#e0b021'; ctx.fillRect(0, 0, 256, 64);
+  ctx.fillStyle = '#16171a';
+  for (let x = -64; x < 320; x += 48) {
+    ctx.beginPath(); ctx.moveTo(x, 64); ctx.lineTo(x + 24, 64); ctx.lineTo(x + 88, 0); ctx.lineTo(x + 64, 0); ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+/**
+ * Kran "spreader"i: konteynerni burchak teshiklaridan (twistlock) ushlovchi sariq teleskopik ramka,
+ * chetlarida xavf chiziqlari, yo'naltiruvchi "flipper"lar, tepada tros g'altakli bosh blok.
+ */
 export function createSpreader() {
   const group = new THREE.Group();
   const grime = makeGrimeTexture(19);
-  const yellow = new THREE.MeshStandardMaterial({ color: '#dcae22', map: grime, roughness: 0.5, metalness: 0.3 });
+  const yellow = new THREE.MeshStandardMaterial({ color: '#e3b122', map: grime, roughness: 0.45, metalness: 0.25 });
+  const hz = hazardTexture();
+  hz.repeat.set(3, 1);
+  const hazard = new THREE.MeshStandardMaterial({ map: hz, roughness: 0.5, metalness: 0.2 });
   const dark = new THREE.MeshStandardMaterial({ color: '#2b323b', map: grime, roughness: 0.5, metalness: 0.6 });
+  const steel = new THREE.MeshStandardMaterial({ color: '#9aa2ab', roughness: 0.3, metalness: 0.9 });
   const cableMat = new THREE.MeshStandardMaterial({ color: '#23282f', roughness: 0.35, metalness: 0.85 });
-  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; group.add(m); return m; };
-  // asosiy ramka (sariq — haqiqiy spreaderlar kabi), teleskopik uchlar
-  add(new THREE.BoxGeometry(0.55, 0.36, C.L - 0.6), yellow, 0, 0.38, 0);
+  const add = (geo, mat, x, y, z, rx = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z); m.rotation.set(rx, 0, rz);
+    m.castShadow = m.receiveShadow = true;
+    group.add(m);
+    return m;
+  };
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+  // markaziy quti to'sin va ichidan chiqadigan teleskopik qo'llar
+  add(B(0.62, 0.46, 2.6), yellow, 0, 0.42, 0);
   for (const s of [-1, 1]) {
-    add(new THREE.BoxGeometry(C.W - 0.1, 0.24, 0.34), yellow, 0, 0.2, s * (C.L / 2 - 0.25));
-    add(new THREE.BoxGeometry(0.4, 0.3, 0.9), dark, 0, 0.38, s * (C.L / 2 - 0.9));
+    add(B(0.5, 0.36, C.L / 2 - 1.5), yellow, 0, 0.4, s * (C.L / 4 + 0.62));
+    // chetdagi ko'ndalang to'sin: tashqi yuzasi xavf chiziqli
+    add(B(C.W + 0.12, 0.34, 0.42), [yellow, yellow, yellow, yellow, s > 0 ? hazard : yellow, s > 0 ? yellow : hazard], 0, 0.27, s * (C.L / 2 - 0.2));
     for (const sx of [-1, 1]) {
-      add(new THREE.BoxGeometry(0.2, 0.3, 0.2), dark, sx * (C.W / 2 - 0.1), 0.1, s * (C.L / 2 - 0.12)); // twistlock
-      add(new THREE.BoxGeometry(0.06, 0.6, 0.5), yellow, sx * (C.W / 2 + 0.02), -0.05, s * (C.L / 2 - 0.4)); // flipper
+      add(B(0.26, 0.2, 0.26), dark, sx * (C.W / 2 - 0.1), 0.06, s * (C.L / 2 - 0.12));                // twistlock korpusi
+      add(new THREE.CylinderGeometry(0.035, 0.035, 0.12, 10), steel, sx * (C.W / 2 - 0.1), -0.07, s * (C.L / 2 - 0.12)); // twistlock tishi
+      add(B(0.05, 0.55, 0.42), yellow, sx * (C.W / 2 + 0.06), -0.08, s * (C.L / 2 - 0.25), 0, sx * 0.18); // flipper
+      add(B(0.5, 0.18, 0.18), dark, sx * 0.55, 0.62, s * (C.L / 2 - 1.1));                               // gidravlika
     }
   }
-  add(new THREE.BoxGeometry(1.5, 0.55, 2.3), yellow, 0, 0.75, 0);
-  add(new THREE.BoxGeometry(1.0, 0.25, 1.6), dark, 0, 1.12, 0);
+  // bosh blok (headblock) va tros g'altaklari
+  add(B(1.7, 0.5, 2.5), yellow, 0, 0.92, 0);
+  add(B(1.72, 0.08, 2.52), hazard, 0, 1.2, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    add(new THREE.CylinderGeometry(0.28, 0.28, 0.16, 18), dark, sx * 0.5, 1.32, sz * 0.9, 0, Math.PI / 2);
+  }
   const cables = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), cableMat);
-    c.userData.off = new THREE.Vector3(sx * 0.5, 1.2, sz * 0.9);
-    c.castShadow = true;
-    cables.push(c);
-    group.add(c);
+    const cbl = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), cableMat);
+    cbl.userData.off = new THREE.Vector3(sx * 0.5, 1.5, sz * 0.9);
+    cbl.castShadow = true;
+    cables.push(cbl);
+    group.add(cbl);
   }
   /** trosslar uzunligi — tepadagi trolleygacha (dunyo Y koordinatasida) */
   const setTop = (worldTopY) => {
-    const len = Math.max(0.1, worldTopY - group.position.y - 1.2);
-    for (const c of cables) {
-      c.scale.y = len;
-      c.position.set(c.userData.off.x, c.userData.off.y + len / 2, c.userData.off.z);
+    const len = Math.max(0.1, worldTopY - group.position.y - 1.5);
+    for (const cbl of cables) {
+      cbl.scale.y = len;
+      cbl.position.set(cbl.userData.off.x, cbl.userData.off.y + len / 2, cbl.userData.off.z);
     }
   };
   return { group, setTop };

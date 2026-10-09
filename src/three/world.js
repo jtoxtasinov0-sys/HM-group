@@ -11,7 +11,7 @@ import { createGarageEnv } from './env.js';
 import { createSkyEnvMap } from './sky.js';
 import { createGarage, G } from './garage.js';
 import { createContainer, createSpreader } from './container.js';
-import { createPort, prepareShip } from './port.js';
+import { createPort } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
 import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR } from './story.js';
@@ -103,10 +103,10 @@ export class World {
     // dunyolar
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
-    this.envYard = createSkyEnvMap(renderer, this.garage.anim.yardSky);
+    this.envYard = createSkyEnvMap(renderer, this.garage.anim.yardSky, 0.85);
     this.port = createPort({ quality });
     this.skyUniforms = this.port.sky.uniforms;
-    this.envSky = createSkyEnvMap(renderer, this.port.sky);
+    this.envSky = createSkyEnvMap(renderer, this.port.sky, 0.9);
     this.port.group.visible = false;
     scene.add(this.port.group);
 
@@ -206,9 +206,7 @@ export class World {
     // kema — fon rejimida
     this.shipPromise = load('ship').then((g) => {
       const ship = g.scene;
-      prepareShip(ship);
-      ship.rotation.y = Math.PI; // burni +Z tomonga (suzish yo'nalishi)
-      this.port.shipHolder.add(ship);
+      this.port.setShip(ship);
       this.ship = ship;
       this.story?.onShipLoaded?.();
     }).catch((e) => console.warn('ship load failed', e));

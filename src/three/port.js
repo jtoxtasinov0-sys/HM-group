@@ -12,37 +12,111 @@ export const P = {
   quayEdgeX: 11.5,
   shipX: 22.2,          // kema o'q chizig'i
   shipZ: -24,           // kema markazi (yuklash nuqtasi kema bo'ylab +7.6 da)
-  shipDraftY: 7.2,      // model ichidagi suv chizig'i balandligi
+  shipDraftY: 7.2,      // model ichidagi suv chizig'i balandligi (masshtabdan oldin)
+  // Modeldagi konteynerlar haqiqiydan eni va bo'yi ~1.3 baravar katta (qatlam 3.5 m, eni 3.15 m),
+  // uzunligi esa 11.9 m. Kema shunga moslab kichraytiriladi — konteynerlarimiz bilan bir xil o'lcham.
+  shipScale: new THREE.Vector3(0.775, 0.74, 1.0245),
+  // Kemadagi joy (kema ichidagi koordinata, metr): ustki qatordagi bitta 40 futlik uyacha.
+  // Dengiz tomondagi chetki ustun — logotip kameraga ko'rinadi. U "bo'shatiladi": yarmiga HM konteyneri
+  // tushadi, yarmida boshqa 20 futlik konteyner turadi.
+  bay: { x0: 2.557, x1: 4.96, z0: 6.045, z1: 18.236, top: 19.985, tier: 2.59 },
   craneLegX: [-12, 10], // quruqlik / suv tomondagi oyoqlar
   craneHalfGauge: 11,
   boomY: 41,
   // quyosh: kema suzib ketadigan tomonda (+z), ufqdan ~11° — "oltin soat" yorug'i
   sunDir: new THREE.Vector3(-0.2, 0.19, 0.96).normalize(),
 };
+// quyosh yo'nalishiga perpendikulyar o'qlar (soya kamerasi tekisligi)
+const SUN_X = new THREE.Vector3(0, 1, 0).cross(P.sunDir).normalize();
+const SUN_Y = new THREE.Vector3().crossVectors(P.sunDir, SUN_X).normalize();
+/** HM konteyneri tushadigan nuqta (kema ichida): pastki markazi */
+P.slotLocal = new THREE.Vector3((P.bay.x0 + P.bay.x1) / 2, P.bay.top - P.bay.tier + 0.015, P.bay.z0 + C.L / 2);
 
 // Haqiqiy konteyner liniyalari ranglariga yaqin (biroz eskirgan), HM navy ko'proq
 const STACK_COLORS = [
-  '#1D3E69', '#1D3E69', '#1D3E69', '#3d7aa6', '#c4ac74', '#2f6a4b', '#22407e', '#bf6130',
-  '#8a3038', '#9ea4aa', '#d6d6d1', '#6a4a3b', '#a8372d', '#6e3266', '#2b5d8a', '#d9d4c7',
+  '#1D3E69', '#1D3E69', '#1D3E69', '#22407e', '#2b4f86', '#8f3a2c', '#9a4433', '#7c3027',
+  '#a9aeb3', '#d8d8d3', '#cfd2d4', '#5d6d7c', '#b06a3a', '#2c5a85', '#3f6f9a', '#6b4b3c',
 ];
 
-/** Kema materiallari: haqiqiy ranglar (biroz so'ndirilgan — o'yinchoq ko'rinmasin), soyalar */
-export function prepareShip(ship) {
+// Kema teksturasidagi "kamalak" konteyner ranglarini haqiqiy palitraga o'tkazish (rang tusi bo'yicha):
+// qizil/pushti/binafsha → zang-qizil, to'q sariq → terrakota, sariq → bej, yashil → kulrang, ko'k → navy
+const SHIP_PALETTE_GLSL = /* glsl */`
+  vec3 hmHsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+  }
+  vec3 hmPalette(vec3 c) {
+    vec3 hsv = hmHsv(c);
+    float h = hsv.x;
+    vec3 t = h < 0.07 || h > 0.83 ? vec3(0.40, 0.12, 0.09)
+           : h < 0.15 ? vec3(0.50, 0.24, 0.11)
+           : h < 0.22 ? vec3(0.60, 0.56, 0.48)
+           : h < 0.48 ? vec3(0.47, 0.50, 0.52)
+           : vec3(0.06, 0.15, 0.33);
+    t *= clamp(hsv.z / 0.75, 0.35, 1.25);         // tekstura soyalari saqlanadi
+    float l = dot(c, vec3(0.299, 0.587, 0.114));
+    vec3 grey = vec3(l) * 0.9;
+    return mix(grey, t, smoothstep(0.22, 0.42, hsv.y) * step(0.1, hsv.z));
+  }
+`;
+
+/**
+ * Kema materiallari: haqiqiy ranglar, soyalar, masshtab. bay — ustki qatordagi uyacha:
+ * u yerdagi geometriya chizilmaydi (va soya ham bermaydi) — HM konteyneri uchun joy.
+ * Qaytaradi: update() — har kadrda chaqiriladi (kema chayqalganda uyacha ham birga yuradi).
+ */
+export function prepareShip(ship, holder) {
+  ship.scale.copy(P.shipScale);
+  const b = P.bay;
+  const uHoleMat = { value: new THREE.Matrix4() };
+  const uHoleMin = { value: new THREE.Vector3(b.x0 - 0.03, b.top - b.tier + 0.03, b.z0 - 0.03) };
+  const uHoleMax = { value: new THREE.Vector3(b.x1 + 0.03, b.top + 0.4, b.z1 + 0.03) };
+  const inject = (s, palette) => {
+    s.uniforms.uHoleMat = uHoleMat; s.uniforms.uHoleMin = uHoleMin; s.uniforms.uHoleMax = uHoleMax;
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform mat4 uHoleMat;\nvarying vec3 vHoleP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHoleP = (uHoleMat * modelMatrix * vec4(transformed, 1.0)).xyz;');
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', `#include <common>\nuniform vec3 uHoleMin;\nuniform vec3 uHoleMax;\nvarying vec3 vHoleP;\n${palette ? SHIP_PALETTE_GLSL : ''}`)
+      .replace('void main() {', 'void main() {\n  if (all(greaterThan(vHoleP, uHoleMin)) && all(lessThan(vHoleP, uHoleMax))) discard;');
+    if (palette) {
+      s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb = hmPalette(diffuseColor.rgb);');
+    }
+  };
+  const depthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  depthMat.onBeforeCompile = (s) => inject(s, false);
   ship.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true;
     o.receiveShadow = true;
+    o.customDepthMaterial = depthMat;
     const m = o.material;
     m.envMapIntensity = 1;
     if (m.metalness > 0.5) m.metalness = 0.4; // bo'yalgan po'lat
-    m.onBeforeCompile = (s) => {
-      s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-        float hmL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-        diffuseColor.rgb = mix(vec3(hmL), diffuseColor.rgb, 0.5) * 0.84;`);
-    };
+    m.onBeforeCompile = (s) => inject(s, true);
     m.customProgramCacheKey = () => 'ship-real';
     m.needsUpdate = true;
   });
+
+  // uyachaning ikkinchi yarmida turgan oddiy 20 futlik konteyner
+  const st = makeStackTextures();
+  const geo = new THREE.BoxGeometry(C.W, C.H, C.L);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < 8; i++) uv.setX(i, uv.getX(i) * 0.5);
+  for (let i = 8; i < 24; i++) uv.setX(i, uv.getX(i) * 0.2);
+  const filler = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: '#8f3a2c', map: st.map, normalMap: st.normalMap, roughnessMap: st.roughnessMap, roughness: 1, metalness: 0.35,
+  }));
+  filler.position.set((b.x0 + b.x1) / 2, b.top - b.tier + C.H / 2 + 0.015, b.z1 - C.L / 2);
+  filler.castShadow = filler.receiveShadow = true;
+  holder.add(filler);
+
+  return {
+    update() { uHoleMat.value.copy(holder.matrixWorld).invert(); },
+  };
 }
 
 /** Ko'pik — kema orqasida (Kelvin izi) */
@@ -208,8 +282,7 @@ export function createPort({ quality }) {
   const group = new THREE.Group();
   group.name = 'port';
 
-  const sky = createSky({ sunDir: P.sunDir, turbidity: 2.4, rayleigh: 2.3, mie: 0.003, mieG: 0.82, clouds: 0.3, gain: 2.1 });
-  sky.groundColor = '#3b4a58';
+  const sky = createSky({ sunDir: P.sunDir, clouds: 0.4, gain: 1.0, ground: '#1d3550' });
   group.add(sky.mesh);
 
   const ocean = createOcean({ sunDir: P.sunDir, y: P.waterY, reflectRes: quality.mobile ? 256 : 512 });
@@ -237,11 +310,18 @@ export function createPort({ quality }) {
   group.add(new THREE.HemisphereLight('#bcd2ec', '#4b5561', 0.55));
 
   const shipHolder = new THREE.Group();
-  shipHolder.position.set(P.shipX, P.waterY - P.shipDraftY, P.shipZ);
+  shipHolder.position.set(P.shipX, P.waterY - P.shipDraftY * P.shipScale.y, P.shipZ);
   group.add(shipHolder);
+  let shipPrep = null;
 
   return {
     group, sky, ocean, wake, crane, shipHolder, sun,
+    /** yuklangan kema modelini joyiga qo'yadi (burni +Z tomonga) */
+    setShip(ship) {
+      ship.rotation.y = Math.PI;
+      shipPrep = prepareShip(ship, shipHolder);
+      shipHolder.add(ship);
+    },
     /** focus — soya kamerasining markazi (konteyner / kema) */
     update(time, camera, focus) {
       ocean.update(time);
@@ -249,9 +329,15 @@ export function createPort({ quality }) {
       ocean.mesh.position.x = Math.round(camera.position.x / 50) * 50;
       ocean.mesh.position.z = Math.round(camera.position.z / 50) * 50;
       sky.update(time, camera);
+      if (shipPrep) { shipHolder.updateMatrixWorld(); shipPrep.update(); }
       if (focus) {
-        sun.target.position.copy(focus);
-        sun.position.copy(focus).addScaledVector(P.sunDir, 220);
+        // soya kamerasi tekstura piksellariga "yopishtiriladi" — harakatda soyalar miltillamaydi
+        const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
+        const u = Math.round(focus.dot(SUN_X) / texel) * texel;
+        const v = Math.round(focus.dot(SUN_Y) / texel) * texel;
+        const w = focus.dot(P.sunDir);
+        sun.target.position.set(0, 0, 0).addScaledVector(SUN_X, u).addScaledVector(SUN_Y, v).addScaledVector(P.sunDir, w);
+        sun.position.copy(sun.target.position).addScaledVector(P.sunDir, 220);
       }
     },
   };

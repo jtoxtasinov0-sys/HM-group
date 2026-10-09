@@ -26,10 +26,11 @@ export const T = {
   turnA: 0.25, turnB: 0.29,
   shutA: 0.27, shutB: 0.32,
   driveA: 0.30, driveB: 0.42,
-  closeA: 0.42, closeB: 0.47,
+  closeA: 0.42, closeB: 0.465,
+  // hovlidan portga qisqa o'tish (eshiklar yopilgach) — konteyner portda, haqiqiy fon oldida ko'tariladi
+  fogInA: 0.466, fogInB: 0.479, swap: 0.483, fogOutA: 0.487, fogOutB: 0.515,
   spreadA: 0.49, spreadB: 0.53,
   liftA: 0.53, liftB: 0.64,
-  fogInA: 0.55, fogInB: 0.585, swap: 0.60, fogOutA: 0.615, fogOutB: 0.67,
   moveXA: 0.64, moveXB: 0.70,
   lowerA: 0.70, lowerB: 0.76,
   releaseA: 0.76, releaseB: 0.79,
@@ -48,7 +49,7 @@ export function createStory(world) {
   const A = garage.anim;
 
   const shipBase = port.shipHolder.position.clone();
-  const slot = V(P.shipX, 13, G.container.z);   // kema ustidagi joy (kema yuklangach aniqlanadi)
+  const slot = shipBase.clone().add(P.slotLocal); // kemadagi joy
   const slotLocal = new THREE.Vector3();
   const updateSlotLocal = () => slotLocal.copy(slot).sub(shipBase);
   updateSlotLocal();
@@ -63,16 +64,8 @@ export function createStory(world) {
   let world2 = 'garage';
 
   function onShipLoaded() {
-    // yuklash nuqtasining balandligini kemaning o'zidan o'lchaymiz (yuqoridan nur)
-    port.group.updateMatrixWorld(true);
-    const ray = new THREE.Raycaster();
-    let top = -Infinity;
-    for (const dx of [-1.1, 1.1]) for (const dz of [-2.9, 0, 2.9]) {
-      ray.set(V(P.shipX + dx, 200, G.container.z + dz), V(0, -1, 0));
-      const hit = ray.intersectObject(world.ship, true)[0];
-      if (hit) top = Math.max(top, hit.point.y);
-    }
-    if (Number.isFinite(top)) slot.y = top + 0.02;
+    // konteyner kemadagi bo'shatilgan uyachaga — qo'shni konteynerlar bilan bir qatorda tushadi
+    slot.copy(shipBase).add(P.slotLocal);
     updateSlotLocal();
   }
 
@@ -114,7 +107,7 @@ export function createStory(world) {
     // kran strelasi bo'ylab — yon tomondan
     { p: T.moveXB, cam: () => ({ pos: V(15, 27, 54), tgt: V(12, 21, -16), fov: pr() ? 64 : 44 }) },
     // kemaga tushirish — dengiz tomondan
-    { p: T.lowerB, cam: () => ({ pos: V(44, 25, 10), tgt: V(P.shipX, slot.y + 0.5, G.container.z), fov: pr() ? 60 : 38 }) },
+    { p: T.lowerB, cam: () => ({ pos: V(44, 25, 10), tgt: V(slot.x, slot.y + 0.5, slot.z), fov: pr() ? 60 : 38 }) },
     { p: 0.83, cam: () => ({ pos: V(72, 40, 36), tgt: V(P.shipX - 2, 6, -18), fov: pr() ? 62 : 40 }) },
     // yakun: kema quyosh tomon, ufqqa suzib ketadi
     { p: 1.0, cam: () => ({ pos: V(80, 28, -50), tgt: V(14, 4, 210), fov: pr() ? 60 : 36 }) },
@@ -287,23 +280,27 @@ export function createStory(world) {
 
   // ---------- har kadr ----------
   function update(p, dt, time) {
-    // --- konteyner holati ---
-    contPos.copy(G.container);
-    if (p >= T.liftA) {
-      const lift = easeSine(seg(p, T.liftA, T.liftB));
-      const mx = ease(seg(p, T.moveXA, T.moveXB));
-      const low = ease(seg(p, T.lowerA, T.lowerB));
-      contPos.set(lerp(0, slot.x, mx), lerp(lift * LIFT_TOP, slot.y, low), lerp(G.container.z, slot.z, mx));
-    }
-    // kema harakati
+    // kema harakati (chayqalish, keyin suzib ketish)
     const sail = seg(p, T.sailA, T.sailB);
     const ship = port.shipHolder;
     ship.position.set(shipBase.x + 6 * sail * sail, shipBase.y + Math.sin(time * 0.6) * 0.08, shipBase.z + 200 * Math.pow(sail, 1.6));
     ship.rotation.z = Math.sin(time * 0.45) * 0.006;
     ship.rotation.x = Math.sin(time * 0.33 + 1) * 0.003;
-    if (p >= T.lowerB) contPos.copy(ship.position).add(slotLocal);
+
+    // --- konteyner holati ---
+    // nishon — kemadagi uyacha, kema bilan birga chayqaladi: tushayotganda ham unga ergashadi,
+    // aks holda oxirida konteyner pastdagi konteynerga kirib-chiqib miltillaydi
+    contPos.copy(G.container);
+    let low = 0;
+    if (p >= T.liftA) {
+      const lift = easeSine(seg(p, T.liftA, T.liftB));
+      const mx = ease(seg(p, T.moveXA, T.moveXB));
+      low = ease(seg(p, T.lowerA, T.lowerB));
+      tmpA.copy(ship.position).add(slotLocal);
+      contPos.set(lerp(0, tmpA.x, mx), lerp(lift * LIFT_TOP, tmpA.y, low), lerp(G.container.z, tmpA.z, mx));
+    }
     container.group.position.copy(contPos);
-    if (p >= T.lowerB) container.group.rotation.set(ship.rotation.x, 0, ship.rotation.z); else container.group.rotation.set(0, 0, 0);
+    container.group.rotation.set(ship.rotation.x * low, 0, ship.rotation.z * low);
 
     // eshiklar va ichki chiroq
     const closeL = ease(seg(p, T.closeA, T.closeA + 0.035));
@@ -322,6 +319,8 @@ export function createStory(world) {
       spreader.setTop(port.crane.ropeTop);
     }
     port.crane.trolley.position.x = spreadVis ? contPos.x : port.crane.trolley.position.x;
+    // kran relslar bo'ylab konteyner bilan birga siljiydi (kemadagi joy biroz boshqa z da)
+    port.crane.group.position.z = (slot.z - G.container.z) * ease(seg(p, T.moveXA, T.moveXB));
 
     // --- dunyoni almashtirish (tuman ichida) ---
     const inPort = p >= T.swap;
@@ -355,12 +354,11 @@ export function createStory(world) {
 
     // ekspozitsiya / bloom
     const portK = seg(p, T.swap, T.fogOutB);
-    // garajda faqat juda yorqin narsalar porlaydi (tom-oyna, chiroqlar) — oq devorlar emas
-    world.bloom.enabled = true;
-    // garajda faqat chiroqlar porlaydi (mashina lakidagi akslar emas — aks holda "tuman" bo'ladi)
-    world.bloom.strength = lerp(0.28, 0.16, portK);
-    world.bloom.threshold = lerp(5.0, 5.5, portK);
-    world.bloom.radius = lerp(0.42, 0.3, portK);
+    // bloom faqat dengizda (quyosh va suvdagi yaltirash); garajda yorug'lik "tuman" bo'lib ketmasin
+    world.bloom.enabled = inPort;
+    world.bloom.strength = 0.16;
+    world.bloom.threshold = 5.5;
+    world.bloom.radius = 0.3;
     world.renderer.toneMappingExposure = lerp(1.0, 0.92, portK);
     world.grade.uniforms.uVignette.value = lerp(0.6, 0.35, portK);
 
@@ -381,7 +379,7 @@ export function createStory(world) {
       // sahna logosi va chiroqlar
       A.stageLogo.material.opacity = 0.55 * (1 - seg(p, 0.03, 0.08));
       const stageOn = seg(p, 0.05, 0.11) * (1 - seg(p, T.driveA, T.driveA + 0.05));
-      A.stageSpot.intensity = 160 * stageOn;
+      A.stageSpot.intensity = 55 * stageOn;
       A.stage.rimMat.color.copy(A.stage.base).multiplyScalar(1 + 2.2 * stageOn);
       A.stage.group.rotation.y = (p >= T.moveB && p < T.driveA) ? ents[world.selected].root.rotation.y : A.stage.group.rotation.y;
 
@@ -424,7 +422,7 @@ export function createStory(world) {
       if (hoverSpotTarget) {
         A.hoverSpot.target.position.copy(hoverSpotTarget.root.position);
         A.hoverSpot.position.set(hoverSpotTarget.root.position.x + 1.2, G.ceilY - 0.3, hoverSpotTarget.root.position.z + 2.5);
-        A.hoverSpot.intensity = 140 * hoverSpotTarget.hover;
+        A.hoverSpot.intensity = 50 * hoverSpotTarget.hover;
       } else A.hoverSpot.intensity = damp(A.hoverSpot.intensity, 0, 5, dt);
 
       // showcase paytida garaj "teatr" kabi xiralashadi

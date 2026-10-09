@@ -319,7 +319,7 @@ export function createGarage({ quality }) {
   key.position.set(4, 12, 10);
   group.add(key);
   // katta doira ostidagi yumshoq yorug'lik "hovuzi" — mashinalarga yumshoq soya beradi
-  const skySpot = new THREE.SpotLight('#ffffff', 80, 24, 1.05, 1, 1.4);
+  const skySpot = new THREE.SpotLight('#ffffff', 55, 24, 1.05, 1, 1.4);
   skySpot.position.set(G.stage.x, G.ceilY + 0.1, G.stage.z);
   skySpot.target.position.set(G.stage.x, 0, G.stage.z);
   if (quality.shadows) {
@@ -368,7 +368,7 @@ export function createGarage({ quality }) {
     lastAmb = k;
     hemi.intensity = 0.5 * k;
     key.intensity = 0.5 * k;
-    skySpot.intensity = 80 * (0.5 + 0.5 * k);
+    skySpot.intensity = 55 * (0.5 + 0.5 * k);
     for (const m of dimmable) m.envMapIntensity = m.userData.baseEnv * k;
     skyMat.color.copy(skyBase).multiplyScalar(0.55 + 0.45 * k);
     dlMat.color.copy(dlBase).multiplyScalar(0.5 + 0.5 * k);
@@ -404,8 +404,7 @@ export function createGarage({ quality }) {
 /** Darvoza orqasidagi ochiq hovli: osmon, beton maydon, chiziqlar, atrofda konteynerlar, devor, chiroqlar */
 function createYard(quality) {
   const group = new THREE.Group();
-  const sky = createSky({ sunDir: YARD_SUN, turbidity: 2.4, rayleigh: 1.25, mie: 0.004, mieG: 0.8, clouds: 0.38, gain: 1.9 });
-  sky.groundColor = '#6d747c';
+  const sky = createSky({ sunDir: YARD_SUN, clouds: 0.38, gain: 1.05, ground: '#6d747c', sunGlow: '#fff0d6' });
   group.add(sky.mesh);
 
   // beton maydon
