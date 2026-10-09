@@ -7,7 +7,6 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
-import { createGarageEnv } from './env.js';
 import { createSkyEnvMap } from './sky.js';
 import { createGarage, G } from './garage.js';
 import { createContainer, createSpreader } from './container.js';
@@ -97,13 +96,14 @@ export class World {
     this.camera = camera;
 
     // muhit xaritalari
-    this.envGarage = createGarageEnv(renderer);
-    scene.environment = this.envGarage;
 
     // dunyolar
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
+    // garaj ichi ham hovli osmonidan olingan muhitni aks ettiradi: devorlar ko'kish-kulrang,
+    // pol va lak akslari kontrastli (oq "studiya" muhiti sahnani oqartirib yuborardi)
     this.envYard = createSkyEnvMap(renderer, this.garage.anim.yardSky, 0.85);
+    scene.environment = this.envYard;
     this.port = createPort({ quality });
     this.skyUniforms = this.port.sky.uniforms;
     this.envSky = createSkyEnvMap(renderer, this.port.sky, 0.9);

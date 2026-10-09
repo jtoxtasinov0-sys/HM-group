@@ -92,7 +92,11 @@ src/three/world.js      — renderer, yuklash, hover / tanlash
 src/three/story.js      — skroll hikoyasi (kamera, konteyner, kran, kema)
 src/three/garage.js     — garaj sahnasi
 src/three/container.js  — HM GROUP konteyneri (ochiladigan eshiklar bilan)
-src/three/port.js       — okean, osmon, kran, port, kema
+src/three/port.js       — port: prichal, konteyner steklari, kema (va undagi joy)
+src/three/crane.js      — konteyner krani (STS)
+src/three/ocean.js      — aks beruvchi okean (FFT to'lqinlar)
+src/three/sky.js        — osmon (quyosh, bulutlar) va undan muhit xaritasi
+src/three/textures.js   — protsedural teksturalar (bo'yoq, zang, beton, devor, darvoza)
 src/three/materials.js  — mashina bo'yoqlari
 src/three/wheels.js     — g'ildiraklarni ajratish (aylanish, rul, podveska)
 tools/                  — model optimizatsiyasi

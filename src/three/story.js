@@ -331,8 +331,8 @@ export function createStory(world) {
       port.group.visible = inPort;
       ents.forEach((e) => { e.root.visible = !inPort; });
     }
-    // muhit xaritasi: garaj ichi → hovli (mashina eshikdan chiqqanda) → port
-    const env = inPort ? world.envSky : p > T.driveA + 0.075 ? world.envYard : world.envGarage;
+    // muhit xaritasi: garaj va hovli → port
+    const env = inPort ? world.envSky : world.envYard;
     if (scene.environment !== env) scene.environment = env;
 
     // tuman
