@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>HM Group — Koreyadan avtomobillar</title>
+  <meta name="description" content="HM Group — Janubiy Koreyadan O'zbekistonga va butun dunyoga avtomobil eksporti. Biz — Koreyada. Hamkorlarimiz — butun dunyoda." />
+  <meta name="theme-color" content="#16335D" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body class="is-loading">
+
+  <!-- ============ PRELOADER ============ -->
+  <div class="loader" id="loader" aria-live="polite">
+    <div class="loader__inner">
+      <svg class="loader__logo" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="loader__ring" cx="50" cy="50" r="48" />
+        <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
+      </svg>
+      <div class="loader__bar"><span id="loaderBar"></span></div>
+      <div class="loader__meta"><span data-i18n="loader.text">Garaj tayyorlanmoqda</span><span id="loaderPct">0%</span></div>
+    </div>
+  </div>
+
+  <!-- ============ HEADER ============ -->
+  <header class="nav" id="nav">
+    <a class="nav__brand" href="#top" aria-label="HM Group">
+      <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="50" fill="#1D3E69" />
+        <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
+      </svg>
+      <span class="nav__word">HM GROUP</span>
+    </a>
+    <nav class="nav__links" id="navLinks">
+      <a href="#sotuvda" data-i18n="nav.sale">Sotuvda</a>
+      <a href="#sotildi" data-i18n="nav.sold">Sotildi</a>
+      <a href="#mijozlar" data-i18n="nav.clients">Mijozlar</a>
+      <a href="#biz-haqimizda" data-i18n="nav.about">Biz haqimizda</a>
+      <a href="#logistika" data-i18n="nav.logistics">Logistika</a>
+      <a href="#kontakt" data-i18n="nav.contact">Kontakt</a>
+    </nav>
+    <div class="nav__right">
+      <div class="lang" role="group" aria-label="Til / Язык">
+        <button type="button" data-lang="uz" class="is-active">UZ</button>
+        <button type="button" data-lang="ru">RU</button>
+      </div>
+      <a class="btn btn--sm nav__cta" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener" data-i18n="nav.cta">Bog'lanish</a>
+      <button class="nav__burger" id="burger" type="button" aria-label="Menu"><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ============ 3D HIKOYA ============ -->
+    <section class="story" id="story">
+      <div class="story__sticky">
+        <canvas class="webgl" id="webgl"></canvas>
+
+        <!-- Hero -->
+        <div class="layer hero" data-layer="hero">
+          <div class="hero__copy">
+            <p class="eyebrow" data-i18n="hero.eyebrow">Janubiy Koreya → O'zbekiston va dunyo</p>
+            <h1 class="hero__title" data-i18n-html="hero.title">Biz — Koreyada.<br><em>Hamkorlarimiz — butun dunyoda</em></h1>
+            <p class="hero__text" data-i18n="hero.text"></p>
+            <div class="hero__btns">
+              <a class="btn btn--navy" href="#sotuvda" data-i18n="hero.cta">Mashina tanlash</a>
+              <a class="btn btn--navy-ghost" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener" data-i18n="hero.cta2">Telegram kanal</a>
+            </div>
+          </div>
+          <div class="hero__bottom">
+            <div class="counter">
+              <span class="counter__num" id="counterNum">03</span>
+              <span class="counter__total">/ 06</span>
+              <span class="counter__name" id="counterName">G 63</span>
+            </div>
+            <div class="hint">
+              <span class="hint__mouse" aria-hidden="true"><i></i></span>
+              <span class="hint__text" id="hintText" data-i18n="hero.hint">Mashinaga sichqonchani olib boring — bosib tanlang</span>
+            </div>
+            <div class="scrollcue"><span data-i18n="hero.scroll">Skroll — yo'lni ko'ring</span><i></i></div>
+          </div>
+          <div class="mobile-nav">
+            <button type="button" class="round" id="prevCar" aria-label="Oldingi">‹</button>
+            <button type="button" class="btn btn--navy btn--sm" id="chooseCar" data-i18n="hero.choose">Tanlash</button>
+            <button type="button" class="round" id="nextCar" aria-label="Keyingi">›</button>
+          </div>
+        </div>
+
+        <!-- Hover tooltip -->
+        <div class="cartip" id="cartip" aria-hidden="true">
+          <span class="cartip__brand" id="tipBrand"></span>
+          <strong class="cartip__model" id="tipModel"></strong>
+          <span class="cartip__meta" id="tipMeta"></span>
+        </div>
+
+        <!-- Showcase -->
+        <div class="layer showcase" data-layer="showcase">
+          <div class="showcase__head">
+            <span class="eyebrow" data-i18n="spec.selected">Tanlangan avtomobil</span>
+            <span class="showcase__brand" id="scBrand">Mercedes-AMG</span>
+            <strong class="showcase__model" id="scModel">G 63</strong>
+          </div>
+          <dl class="specs" id="scSpecs"></dl>
+          <div class="showcase__cta">
+            <span class="showcase__price" data-i18n="spec.price">Narx — so'rov bo'yicha</span>
+            <a class="btn btn--light" id="scLink" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener" data-i18n="spec.cta">Ma'lumot olish</a>
+          </div>
+        </div>
+
+        <!-- Bo'limlar -->
+        <article class="layer chapter" data-layer="ch1">
+          <span class="chapter__num" data-i18n="ch1.num">01 — Konteyner</span>
+          <h2 class="chapter__title" data-i18n="ch1.title"></h2>
+          <p class="chapter__text" data-i18n="ch1.text"></p>
+          <ul class="chapter__list">
+            <li data-i18n="ch1.b1"></li><li data-i18n="ch1.b2"></li><li data-i18n="ch1.b3"></li>
+          </ul>
+        </article>
+        <article class="layer chapter" data-layer="ch2">
+          <span class="chapter__num" data-i18n="ch2.num">02 — Kema</span>
+          <h2 class="chapter__title" data-i18n="ch2.title"></h2>
+          <p class="chapter__text" data-i18n="ch2.text"></p>
+          <ul class="chapter__list">
+            <li data-i18n="ch2.b1"></li><li data-i18n="ch2.b2"></li><li data-i18n="ch2.b3"></li>
+          </ul>
+        </article>
+        <article class="layer chapter chapter--final" data-layer="ch3">
+          <span class="chapter__num" data-i18n="ch3.num">03 — Yetkazish</span>
+          <div class="days"><span class="days__num" id="daysNum">25</span><span class="days__label" data-i18n="ch3.days">kun yo'lda</span></div>
+          <h2 class="chapter__title" data-i18n="ch3.title"></h2>
+          <p class="chapter__text" data-i18n="ch3.text"></p>
+          <div class="route" aria-hidden="true">
+            <span>KOREA</span><i><b></b></i><span>UZBEKISTAN</span>
+          </div>
+          <a class="btn btn--light" href="#kontakt" data-i18n="ch3.cta">Buyurtma berish</a>
+        </article>
+
+        <!-- Progress -->
+        <ol class="rail" id="rail" aria-hidden="true">
+          <li data-at="0"><span data-i18n="rail.garage">Garaj</span></li>
+          <li data-at="0.3"><span data-i18n="rail.container">Konteyner</span></li>
+          <li data-at="0.56"><span data-i18n="rail.ship">Kema</span></li>
+          <li data-at="0.8"><span data-i18n="rail.delivery">Yetkazish</span></li>
+          <b class="rail__fill" id="railFill"></b>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ SOTUVDA ============ -->
+    <section class="section section--light" id="sotuvda">
+      <div class="wrap">
+        <header class="sec-head reveal">
+          <span class="eyebrow eyebrow--dark" data-i18n="sale.eyebrow">Katalog</span>
+          <h2 class="sec-title" data-i18n="sale.title">Sotuvda</h2>
+          <p class="sec-text" data-i18n="sale.text"></p>
+        </header>
+        <div class="filters reveal" id="filters" role="tablist">
+          <button type="button" class="chip is-active" data-filter="all" data-i18n="filter.all">Barchasi</button>
+          <button type="button" class="chip" data-filter="suv" data-i18n="filter.suv">SUV</button>
+          <button type="button" class="chip" data-filter="sedan" data-i18n="filter.sedan">Sedan</button>
+          <button type="button" class="chip" data-filter="van" data-i18n="filter.van">Miniven</button>
+          <button type="button" class="chip" data-filter="ev" data-i18n="filter.ev">Elektr</button>
+        </div>
+        <div class="grid cards" id="catalog"></div>
+      </div>
+    </section>
+
+    <!-- ============ SOTILDI ============ -->
+    <section class="section section--white" id="sotildi">
+      <div class="wrap">
+        <header class="sec-head sec-head--row reveal">
+          <div>
+            <span class="eyebrow eyebrow--dark" data-i18n="sold.eyebrow">Portfolio</span>
+            <h2 class="sec-title" data-i18n="sold.title">Sotildi</h2>
+          </div>
+          <p class="sec-text" data-i18n="sold.text"></p>
+        </header>
+      </div>
+      <div class="sold-strip" id="sold"></div>
+      <div class="wrap center reveal">
+        <a class="btn btn--navy-ghost" href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener" data-i18n="sold.more">Instagram'da ko'rish</a>
+      </div>
+    </section>
+
+    <!-- ============ MIJOZLAR ============ -->
+    <section class="section section--light" id="mijozlar">
+      <div class="wrap">
+        <header class="sec-head reveal">
+          <span class="eyebrow eyebrow--dark" data-i18n="clients.eyebrow">Mijozlar</span>
+          <h2 class="sec-title" data-i18n="clients.title">Mijozlarimiz fikri</h2>
+          <p class="sec-text" data-i18n="clients.text"></p>
+        </header>
+        <div class="clients" id="clients"></div>
+        <div class="center reveal">
+          <a class="btn btn--navy" href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener" data-i18n="clients.more">Barcha fikrlar — Instagram'da</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ BIZ HAQIMIZDA ============ -->
+    <section class="section section--navy" id="biz-haqimizda">
+      <div class="wrap about">
+        <div class="about__copy reveal">
+          <span class="eyebrow" data-i18n="about.eyebrow">Biz haqimizda</span>
+          <h2 class="sec-title sec-title--light" data-i18n-html="about.title"></h2>
+          <p class="sec-text sec-text--light" data-i18n="about.text"></p>
+        </div>
+        <div class="stats reveal">
+          <div class="stat"><b data-count="80.8" data-suffix="K">80,8K</b><span data-i18n="about.s1"></span></div>
+          <div class="stat"><b data-count="650" data-suffix="+">650+</b><span data-i18n="about.s2"></span></div>
+          <div class="stat"><b data-count="25" data-prefix="~">~25</b><span data-i18n="about.s3"></span></div>
+          <div class="stat"><b><svg viewBox="0 0 24 24" class="verified" aria-hidden="true"><path d="M12 1.8l2.4 1.8 3-.2 1 2.8 2.5 1.7-.9 2.9.9 2.9-2.5 1.7-1 2.8-3-.2L12 22.2l-2.4-1.8-3 .2-1-2.8L3.1 16l.9-2.9-.9-2.9 2.5-1.7 1-2.8 3 .2z"/><path d="M8 12.2l2.6 2.6L16.2 9" class="tick"/></svg></b><span data-i18n="about.s4"></span></div>
+        </div>
+      </div>
+      <div class="wrap awards">
+        <div class="award reveal">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="18" r="11"/><path d="M17 27l-4 15 11-6 11 6-4-15"/><path d="M19.5 18l3 3 6-6"/></svg>
+          <h3 data-i18n="about.a1t"></h3><p data-i18n="about.a1"></p>
+        </div>
+        <div class="award reveal">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 42V8"/><path d="M8 9h26l-5 7 5 7H8"/><circle cx="34" cy="38" r="4"/><path d="M20 42h20"/></svg>
+          <h3 data-i18n="about.a2t"></h3><p data-i18n="about.a2"></p>
+        </div>
+        <div class="award reveal">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="17" cy="16" r="6"/><circle cx="33" cy="18" r="5"/><path d="M5 40c0-7 5.5-12 12-12s12 5 12 12"/><path d="M28 30c1.5-1 3-1.5 5-1.5 5.5 0 10 4.5 10 11"/></svg>
+          <h3 data-i18n="about.a3t"></h3><p data-i18n="about.a3"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LOGISTIKA ============ -->
+    <section class="section section--white" id="logistika">
+      <div class="wrap">
+        <header class="sec-head sec-head--row reveal">
+          <div>
+            <span class="eyebrow eyebrow--dark" data-i18n="log.eyebrow">Logistika</span>
+            <h2 class="sec-title" data-i18n="log.title"></h2>
+          </div>
+          <p class="sec-text" data-i18n="log.text"></p>
+        </header>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step__n">01</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="21" cy="21" r="12"/><path d="M30 30l11 11"/></svg>
+            <h3 data-i18n="log.1t"></h3><p data-i18n="log.1"></p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">02</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 30l4-11c1-2.5 2.5-4 5-4h18c2.5 0 4 1.5 5 4l4 11v8H6z"/><circle cx="14" cy="34" r="3"/><circle cx="34" cy="34" r="3"/><path d="M10 24h28"/></svg>
+            <h3 data-i18n="log.2t"></h3><p data-i18n="log.2"></p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">03</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M4 32h40l-5 9H10z"/><path d="M10 32V20h12v12"/><path d="M22 32V14h14v18"/><path d="M4 45c3 0 3-2 6-2s3 2 6 2 3-2 6-2 3 2 6 2 3-2 6-2 3 2 6 2"/></svg>
+            <h3 data-i18n="log.3t"></h3><p data-i18n="log.3"></p>
+          </li>
+          <li class="step reveal">
+            <span class="step__n">04</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 44s14-12 14-24a14 14 0 10-28 0c0 12 14 24 14 24z"/><circle cx="24" cy="20" r="5"/></svg>
+            <h3 data-i18n="log.4t"></h3><p data-i18n="log.4"></p>
+          </li>
+        </ol>
+        <div class="routebar reveal" aria-hidden="true">
+          <span class="routebar__pt"><b>KR</b> Korea</span>
+          <span class="routebar__line"><i></i><em data-i18n="log.days">~25 kun</em></span>
+          <span class="routebar__pt"><b>UZ</b> Uzbekistan</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KONTAKT ============ -->
+    <section class="section section--light" id="kontakt">
+      <div class="wrap">
+        <div class="contact reveal">
+          <div class="contact__copy">
+            <span class="eyebrow" data-i18n="contact.eyebrow">Kontakt</span>
+            <h2 class="sec-title sec-title--light" data-i18n="contact.title"></h2>
+            <p class="sec-text sec-text--light" data-i18n="contact.text"></p>
+            <a class="btn btn--light" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener" data-i18n="contact.write">Telegram'da yozish</a>
+          </div>
+          <div class="contact__cards">
+            <a class="ccard" href="tel:+821044047717">
+              <span class="ccard__flag">KR</span>
+              <span class="ccard__label" data-i18n="contact.kr">Koreya</span>
+              <strong>+82 10 4404 7717</strong>
+            </a>
+            <a class="ccard" href="tel:+998978156006">
+              <span class="ccard__flag">UZ</span>
+              <span class="ccard__label" data-i18n="contact.uz">O'zbekiston</span>
+              <strong>+998 97 815 60 06</strong>
+            </a>
+            <a class="ccard" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener">
+              <svg class="ccard__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 3.5L2.8 10.7c-1 .4-1 1.6 0 1.9l4.6 1.5 1.8 5.6c.3.8 1.2 1 1.8.4l2.6-2.4 4.7 3.5c.7.5 1.6.1 1.8-.7l3.1-15c.2-1-.8-1.8-1.7-1.4z"/><path d="M7.4 14.1L18 6.8"/></svg>
+              <span class="ccard__label" data-i18n="contact.tg">Telegram kanal</span>
+              <strong>HM Group</strong>
+            </a>
+            <a class="ccard" href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener">
+              <svg class="ccard__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="0.9"/></svg>
+              <span class="ccard__label" data-i18n="contact.ig">Instagram</span>
+              <strong>@hmgroup.uz</strong>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__inner">
+      <div class="footer__brand">
+        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="49" fill="none" stroke="#fff" stroke-width="1.5" />
+          <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
+        </svg>
+        <p data-i18n="footer.slogan"></p>
+      </div>
+      <nav class="footer__links">
+        <a href="#sotuvda" data-i18n="nav.sale"></a>
+        <a href="#sotildi" data-i18n="nav.sold"></a>
+        <a href="#mijozlar" data-i18n="nav.clients"></a>
+        <a href="#biz-haqimizda" data-i18n="nav.about"></a>
+        <a href="#logistika" data-i18n="nav.logistics"></a>
+        <a href="#kontakt" data-i18n="nav.contact"></a>
+      </nav>
+      <div class="footer__social">
+        <a href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener">Telegram</a>
+        <a href="tel:+821044047717">+82 10 4404 7717</a>
+        <a href="tel:+998978156006">+998 97 815 60 06</a>
+      </div>
+    </div>
+    <div class="wrap footer__bottom"><span data-i18n="footer.rights"></span></div>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

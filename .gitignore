@@ -1,0 +1,9 @@
+node_modules
+dist
+*.log
+# asl (og'ir) modellar — saytga public/models ichidagi siqilganlari ketadi
+/*.glb
+# ma'lumot uchun yuklangan rasmlar (saytda ishlatilmaydi)
+/*.jpg
+/This isn*
+.claude/

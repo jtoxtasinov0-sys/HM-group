@@ -1,0 +1,69 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>render</title>
+<style>html,body{margin:0;background:#dfe6ef;font:12px monospace}canvas{display:block}#log{position:fixed;top:4px;left:4px}</style>
+</head><body><div id="log"></div>
+<script type="module">
+// Katalog rasmlarini yaratadi: http://localhost:5173/dev/render.html
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { CARS } from '/src/data/cars.js';
+import { prepareCarMaterials } from '/src/three/materials.js';
+import { makeShadowTexture } from '/src/three/textures.js';
+
+const W = 1400, H = 875;
+const log = (s) => { document.getElementById('log').textContent = s; };
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+r.setPixelRatio(1);
+r.setSize(W, H);
+r.toneMapping = THREE.ACESFilmicToneMapping;
+r.toneMappingExposure = 1.0;
+r.setClearColor(0x000000, 0);
+document.body.appendChild(r.domElement);
+
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(r);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.03).texture;
+scene.environmentIntensity = 0.9;
+scene.add(new THREE.HemisphereLight('#ffffff', '#8aa0bc', 0.6));
+const key = new THREE.DirectionalLight('#ffffff', 1.4);
+key.position.set(-4, 8, 6);
+scene.add(key);
+
+const manifest = await fetch('/models/manifest.json').then((x) => x.json());
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const shadowMat = new THREE.MeshBasicMaterial({ alphaMap: makeShadowTexture(), color: '#0b1a30', transparent: true, opacity: 0.8, depthWrite: false });
+const cam = new THREE.PerspectiveCamera(26, W / H, 0.1, 100);
+
+const only = new URLSearchParams(location.search).get('only');
+for (const car of CARS) {
+  if (only && !only.split(',').includes(car.id)) continue;
+  log(`render ${car.id}...`);
+  const g = await loader.loadAsync(`/models/${car.id}.glb`);
+  const model = g.scene;
+  prepareCarMaterials(model, car);
+  const b = manifest[car.id].box;
+  const size = new THREE.Vector3(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+  const holder = new THREE.Group();
+  holder.add(model);
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(size.x + 0.8, size.z + 0.9), shadowMat);
+  sh.rotation.x = -Math.PI / 2; sh.position.y = 0.004;
+  holder.add(sh);
+  holder.rotation.y = -0.62; // 3/4 ko'rinish, old tomoni chapga
+  scene.add(holder);
+
+  // kadrga sig'dirish
+  const len = size.z;
+  const dist = len * 1.72;
+  cam.position.set(Math.sin(0.12) * dist, size.y * 0.62 + 0.55, Math.cos(0.12) * dist);
+  cam.lookAt(0, size.y * 0.42, 0);
+  cam.updateProjectionMatrix();
+  r.render(scene, cam);
+  const blob = await new Promise((res) => r.domElement.toBlob(res, 'image/webp', 0.9));
+  await fetch(`/__save?name=${car.id}`, { method: 'POST', body: blob });
+  scene.remove(holder);
+}
+log('done');
+window.__done = true;
+</script></body></html>
