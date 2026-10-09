@@ -10,7 +10,8 @@ Skroll orqali hikoya qiluvchi premium sayt:
    tormozda kuzov biroz egiladi), markaziy platformaga kiradi va platforma uni aylantiradi, orqada katta nomi ko'rinadi,
    pastda ma'lumotlar paneli chiqadi (yil, dvigatel, quvvat, probeg).
 3. **Konteyner**: eshik ochiladi, mashina HM GROUP konteyneriga kiradi, eshiklar yopiladi.
-4. **Kema**: kran konteynerni ko'taradi, tuman ichidan port ochiladi, konteyner kemaga qo'yiladi.
+4. **Kema**: hovli asta portga almashadi (konteyner joyida qoladi — "match dissolve"), kran konteynerni
+   ko'taradi va strela bo'ylab kemadagi bo'sh uyachaga qo'yadi.
 5. **Yetkazish**: kema quyosh tomon suzib ketadi — "~25 kun".
 
 Undan keyin oddiy bo'limlar keladi: Sotuvda, Sotildi, Mijozlar, Biz haqimizda, Logistika, Kontakt.
@@ -33,14 +34,20 @@ npm run build
 
 Tayyor sayt `dist/` papkasida bo'ladi.
 
-GitHub Pages'ga joylash (sayt: https://jtoxtasinov0-sys.github.io/HM-group/):
+Saytni internetga joylash (asosiy manzil: **https://hmgroup-uz.vercel.app**):
 
 ```bash
 npm run deploy
 ```
 
-Bu saytni yig'ib, `gh-pages` branch'iga push qiladi. Har o'zgarishdan keyin qayta ishga tushiring. Uni istalgan statik hostingga qo'yish mumkin
-(Netlify, Vercel, Cloudflare Pages, oddiy nginx).
+Bu saytni yig'adi va Vercel'dagi `hmgroup-uz` loyihasiga yuklaydi (bir marta `vercel login` kerak).
+Har o'zgarishdan keyin qayta ishga tushiring.
+
+Telegram, Instagram, WhatsApp'da havola rasm bilan chiqadi: rasm — `public/og.jpg` (1200×630),
+sarlavha va matn — `index.html` dagi `og:` teglari. Manzil o'zgarsa, `tools/deploy.mjs` dagi `PROJECT` ni o'zgartiring.
+Telegram eski preview'ni eslab qolsa, @WebpageBot ga havolani yuboring — u yangilaydi.
+
+Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 
 ## Ma'lumotlarni o'zgartirish
 
@@ -88,7 +95,7 @@ src/main.js             — skroll, tillar, katalog, overlaylar
 src/styles.css          — dizayn
 src/i18n.js             — UZ / RU matnlar
 src/data/cars.js        — mashinalar
-src/three/world.js      — renderer, yuklash, hover / tanlash
+src/three/world.js      — renderer va post-effektlar (bloom, tone mapping), yuklash, hover / tanlash
 src/three/story.js      — skroll hikoyasi (kamera, konteyner, kran, kema)
 src/three/garage.js     — garaj sahnasi
 src/three/container.js  — HM GROUP konteyneri (ochiladigan eshiklar bilan)

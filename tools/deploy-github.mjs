@@ -1,4 +1,4 @@
-// Saytni GitHub Pages'ga joylash: npm run deploy
+// Saytni GitHub Pages'ga joylash (zaxira manzil): npm run deploy:github
 // Saytni /<repo-nomi>/ yo'li bilan yig'adi va dist/ ni "gh-pages" branch'iga push qiladi.
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,7 +16,8 @@ const repo = remote.replace(/\.git$/, '').split('/').pop();
 const name = out('git config user.name') || 'deploy';
 const email = out('git config user.email') || 'deploy@localhost';
 
-sh('npx vite build', ROOT, { BASE_PATH: `/${repo}/` });
+const owner0 = remote.replace(/.git$/, '').split('/').slice(-2, -1)[0].toLowerCase();
+sh('npx vite build', ROOT, { BASE_PATH: `/${repo}/`, SITE_URL: `https://${owner0}.github.io/${repo}` });
 fs.writeFileSync(path.join(DIST, '.nojekyll'), '');
 
 const gitDir = path.join(DIST, '.git');

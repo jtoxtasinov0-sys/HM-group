@@ -22,8 +22,15 @@ const saveRenders = {
   },
 };
 
+// Saytning asosiy manzili: ijtimoiy tarmoqlar preview rasmni (og:image) faqat to'liq manzil bilan oladi
+const SITE_URL = (process.env.SITE_URL || 'https://hmgroup-uz.vercel.app').replace(/\/$/, '');
+const socialMeta = {
+  name: 'social-meta',
+  transformIndexHtml: { order: 'pre', handler: (html) => html.replaceAll('%SITE_URL%', SITE_URL) },
+};
+
 export default defineConfig({
-  // GitHub Pages uchun: BASE_PATH=/HM-group/ (npm run deploy beradi); lokalda — '/'
+  // GitHub Pages uchun: BASE_PATH=/HM-group/ (npm run deploy:github beradi); Vercel va lokalda — '/'
   base: process.env.BASE_PATH || '/',
   server: { port: 5173, strictPort: true },
   build: {
@@ -32,5 +39,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1500,
   },
-  plugins: [saveRenders],
+  plugins: [saveRenders, socialMeta],
 });

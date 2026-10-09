@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "models": "node tools/optimize-models.mjs",
-    "deploy": "node tools/deploy.mjs"
+    "deploy": "node tools/deploy.mjs",
+    "deploy:github": "node tools/deploy-github.mjs"
   },
   "dependencies": {
     "gsap": "^3.15.0",
