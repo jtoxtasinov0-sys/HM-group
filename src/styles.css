@@ -129,7 +129,8 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---------- 3D hikoya ---------- */
 .story { position: relative; height: 1150vh; }
-.story__sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
+/* fon — canvas ostida: GPU konteksti bir lahzaga yo'qolsa, oq sahifa emas, sahnaga yaqin rang ko'rinadi */
+.story__sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: linear-gradient(180deg, #8c9aac 0%, #5f6f85 100%); }
 .webgl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: pan-y; }
 .layer { position: absolute; pointer-events: none; opacity: 0; will-change: opacity, transform; color: #fff; }
 .layer.is-on { pointer-events: auto; }
@@ -137,8 +138,8 @@ h1, h2, h3, p { margin: 0; }
 .hero::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(62% 56% at 8% 22%, rgba(246, 248, 251, 0.82), rgba(246, 248, 251, 0) 72%),
-    linear-gradient(180deg, rgba(246, 248, 251, 0.6) 0%, rgba(246, 248, 251, 0) 30%);
+    radial-gradient(58% 54% at 8% 24%, rgba(232, 238, 246, 0.7), rgba(232, 238, 246, 0) 72%),
+    linear-gradient(180deg, rgba(232, 238, 246, 0.42) 0%, rgba(232, 238, 246, 0) 26%);
 }
 .hero { color: var(--deep); }
 .hero { isolation: isolate; inset: 0; padding: 120px var(--gutter) 40px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }

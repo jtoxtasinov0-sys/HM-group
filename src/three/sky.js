@@ -14,6 +14,7 @@ const SKY_FRAG = /* glsl */`
   uniform float uFade;
   uniform vec3 uFadeColor;
   uniform float showSunDisc;
+  uniform float uSunScale;
   uniform float cloudCoverage;
   uniform float cloudScale;
   uniform vec3 uZenith;
@@ -56,9 +57,9 @@ const SKY_FRAG = /* glsl */`
     // quyosh atrofidagi nur: past quyoshda ufq bo'ylab keng oltin tasma
     float band = exp(-hp * 9.0);
     float sunLow = 1.0 - smoothstep(0.05, 0.6, sun.y);
-    col += uSunGlow * (pow(cs, 3.0) * band * 0.38 * sunLow + pow(cs, 10.0) * 0.45 + pow(cs, 80.0) * 0.9 + pow(cs, 900.0) * 2.5);
-    // quyosh diski
-    col += uSunColor * smoothstep(0.99986, 0.99993, cs) * 14.0 * showSunDisc;
+    col += uSunGlow * (pow(cs, 3.0) * band * 0.38 * sunLow + pow(cs, 10.0) * 0.45 + pow(cs, 80.0) * 0.9 + pow(cs, 900.0) * 2.5 * uSunScale);
+    // quyosh diski (suvdagi aks uchun uSunScale = 0: quyosh yo'lakchasini suv shaderi chizadi)
+    col += uSunColor * smoothstep(0.99986, 0.99993, cs) * 14.0 * showSunDisc * uSunScale;
 
     // bulutlar
     if (d.y > 0.0 && cloudCoverage > 0.0) {
@@ -108,6 +109,7 @@ export function createSky(opts = {}) {
     uFade: { value: 0 },
     uFadeColor: { value: new THREE.Color('#d3e1ef') },
     showSunDisc: { value: 1 },
+    uSunScale: { value: 1 },
     cloudCoverage: { value: opts.clouds ?? 0.35 },
     cloudScale: { value: opts.cloudScale ?? 1.4 },
     uZenith: { value: c(opts.zenith, '#3567a8') },

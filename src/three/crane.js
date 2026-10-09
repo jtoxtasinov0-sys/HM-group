@@ -90,7 +90,8 @@ export function createCrane({ zc, legX = [-12, 10], half = 11, boomY = 41 }) {
     yellow: paint('#e2b21c', 0.5, 0.2),
     black: new THREE.MeshStandardMaterial({ color: '#16191d', roughness: 0.7, metalness: 0.3 }),
     rope: new THREE.MeshStandardMaterial({ color: '#2a2f36', roughness: 0.35, metalness: 0.85 }),
-    glass: new THREE.MeshStandardMaterial({ color: '#0e1a28', roughness: 0.05, metalness: 0.9, envMapIntensity: 1.6 }),
+    // kabina oynasi: juda silliq yuzada quyosh bitta pikselda "chaqnab" miltillardi
+    glass: new THREE.MeshStandardMaterial({ color: '#0e1a28', roughness: 0.2, metalness: 0.9, envMapIntensity: 1.4 }),
   };
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const V = (x, y, z) => new THREE.Vector3(x, y, z);

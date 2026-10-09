@@ -1,11 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
 import { createSkyEnvMap } from './sky.js';
 import { createGarage, G } from './garage.js';
@@ -13,35 +10,109 @@ import { createContainer, createSpreader } from './container.js';
 import { createPort } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
-import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR } from './story.js';
+import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR, PORT_HAZE } from './story.js';
 import { rigWheels } from './wheels.js';
 
-const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVignette: { value: 0.55 }, uGrain: { value: 0.028 } },
-  vertexShader: /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+const FS_VERT = /* glsl */`
+  precision highp float;
+  uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix;
+  attribute vec3 position; attribute vec2 uv;
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+/**
+ * Yakuniy kadr: tone mapping (ACES) + sRGB + vinyetka.
+ * NaN/Inf piksellar qora qilinadi — bitta "buzilgan" piksel butun kadrni oqartirib/qoraytirib yubormasin.
+ * Harakatlanuvchi "kino donasi" yo'q: har kadrda o'zgaradigan shovqin ekranni miltillatadi.
+ * O'rniga ko'zga ko'rinmas, joyida turuvchi dither (gradientlarda pog'ona bo'lmasin).
+ */
+const FinalShader = {
+  uniforms: { tDiffuse: { value: null }, toneMappingExposure: { value: 1 }, uVignette: { value: 0.55 } },
+  // GLSL3: isnan/isinf faqat shu versiyada bor
+  vertexShader: /* glsl */`
+    precision highp float;
+    uniform mat4 modelViewMatrix; uniform mat4 projectionMatrix;
+    in vec3 position; in vec2 uv;
+    out vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uTime; uniform float uVignette; uniform float uGrain; varying vec2 vUv;
-    float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-    void main(){
-      vec4 c = texture2D(tDiffuse, vUv);
+    precision highp float;
+    uniform sampler2D tDiffuse;
+    uniform float uVignette;
+    #include <tonemapping_pars_fragment>
+    #include <colorspace_pars_fragment>
+    in vec2 vUv;
+    out vec4 fragColor;
+    void main() {
+      vec3 c = texture(tDiffuse, vUv).rgb;
+      if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
+      c = ACESFilmicToneMapping(max(c, vec3(0.0)));
+      c = sRGBTransferOETF(vec4(c, 1.0)).rgb;
       vec2 d = (vUv - 0.5) * vec2(1.0, 0.85);
-      float v = smoothstep(0.95, 0.28, length(d));
-      c.rgb *= mix(1.0, v, uVignette);
-      c.rgb += (rnd(vUv * 1024.0 + fract(uTime) * 61.0) - 0.5) * uGrain;
-      gl_FragColor = c;
+      c *= mix(1.0, smoothstep(0.95, 0.28, length(d)), uVignette);
+      c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
+      fragColor = vec4(c, 1.0);
     }`,
 };
+
+/** Ikki dunyo orasidagi o'tish: ikkinchi kadr ustidan shaffoflik bilan chiziladi */
+const BlendShader = {
+  uniforms: { tDiffuse: { value: null }, uOpacity: { value: 1 } },
+  vertexShader: FS_VERT,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    uniform sampler2D tDiffuse; uniform float uOpacity; varying vec2 vUv;
+    void main() { gl_FragColor = vec4(texture2D(tDiffuse, vUv).rgb, uOpacity); }`,
+};
+
+/**
+ * Bloom uchun yorqin joylarni ajratish (three.js high-pass o'rniga):
+ *  - NaN/Inf → 0 (aks holda blur ularni butun ekranga yoyadi — kadr oqarib ketadi);
+ *  - 4 nuqtali "Karis" o'rtachasi va yorqinlik chegarasi: bitta pikseldagi yaltirash (quyosh
+ *    chaqnashi, ingichka metall qirra) harakatda katta miltillovchi dog'ga aylanmaydi.
+ */
+const HIGHPASS_FRAG = /* glsl */`
+  uniform sampler2D tDiffuse;
+  uniform vec3 defaultColor;
+  uniform float defaultOpacity;
+  uniform float luminosityThreshold;
+  uniform float smoothWidth;
+  uniform vec2 uTexel;
+  varying vec2 vUv;
+  float hmLum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+  vec3 hmSafe(vec3 c) {
+    if (any(isnan(c)) || any(isinf(c))) return vec3(0.0);
+    c = max(c, vec3(0.0));
+    float m = max(c.r, max(c.g, c.b));
+    return m > 20.0 ? c * (20.0 / m) : c;
+  }
+  void main() {
+    vec3 a = hmSafe(texture2D(tDiffuse, vUv + uTexel * vec2(-0.75, -0.75)).rgb);
+    vec3 b = hmSafe(texture2D(tDiffuse, vUv + uTexel * vec2( 0.75, -0.75)).rgb);
+    vec3 c = hmSafe(texture2D(tDiffuse, vUv + uTexel * vec2(-0.75,  0.75)).rgb);
+    vec3 d = hmSafe(texture2D(tDiffuse, vUv + uTexel * vec2( 0.75,  0.75)).rgb);
+    float wa = 1.0 / (1.0 + hmLum(a)), wb = 1.0 / (1.0 + hmLum(b));
+    float wc = 1.0 / (1.0 + hmLum(c)), wd = 1.0 / (1.0 + hmLum(d));
+    vec3 col = (a * wa + b * wb + c * wc + d * wd) / (wa + wb + wc + wd);
+    float alpha = smoothstep(luminosityThreshold, luminosityThreshold + smoothWidth, hmLum(col));
+    gl_FragColor = mix(vec4(defaultColor, defaultOpacity), vec4(col, 1.0), alpha);
+  }`;
+
+const PIXEL_BUDGET = 3.6e6; // ~2560x1400: undan katta kadr GPU xotirasini to'ldirib, kontekstni yo'qotishi mumkin
 
 export function detectQuality() {
   const coarse = matchMedia('(pointer: coarse)').matches;
   const small = Math.min(innerWidth, innerHeight) < 600;
   const mobile = coarse || small;
+  let dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.75);
+  dpr = Math.min(dpr, Math.sqrt(PIXEL_BUDGET / Math.max(1, innerWidth * innerHeight)));
   return {
     mobile,
-    dpr: Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.75),
+    dpr: Math.max(0.75, dpr),
     reflections: !mobile,
     reflectionRes: 0.5,
-    msaa: mobile ? 0 : 4,
+    // yuqori DPR ekranda piksellar mayda — 2x MSAA yetarli (xotira 2 baravar kam)
+    msaa: mobile ? 0 : dpr > 1.25 ? 2 : 4,
     shadows: !mobile,
     bloom: true,
   };
@@ -69,6 +140,10 @@ export class World {
     // hero kamerasi (desktop)
     this.heroTune = { fov: 34, fit: 10.6, y: 2.0, ty: 1.55, shift: 0.36, pan: 3.2 };
     this.time = 0;
+    // 0 — garaj/hovli, 1 — port; oraliqda ikkala dunyo chiziladi va asta almashadi
+    this.blend = 0;
+    this.spreaderOn = false;
+    this.perf = { ema: 1 / 60, slowFor: 0, warm: 0, last: 0 };
   }
 
   on(type, fn) { this.listeners[type].add(fn); return () => this.listeners[type].delete(fn); }
@@ -79,36 +154,36 @@ export class World {
     const renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     renderer.setPixelRatio(quality.dpr);
     renderer.setSize(innerWidth, innerHeight, false);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // yakuniy kadrda qo'llanadi (FinalShader)
+    renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = quality.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer = renderer;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(GARAGE_FOG.clone(), FOG_NEAR, FOG_FAR);
-    scene.background = GARAGE_FOG.clone();
     this.scene = scene;
 
     const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 0.1, 3000);
     camera.position.set(0, 3.7, 21);
     this.camera = camera;
 
-    // muhit xaritalari
-
     // dunyolar
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
-    // garaj ichi ham hovli osmonidan olingan muhitni aks ettiradi: devorlar ko'kish-kulrang,
-    // pol va lak akslari kontrastli (oq "studiya" muhiti sahnani oqartirib yuborardi)
-    this.envYard = createSkyEnvMap(renderer, this.garage.anim.yardSky, 0.85);
-    scene.environment = this.envYard;
     this.port = createPort({ quality });
     this.skyUniforms = this.port.sky.uniforms;
-    this.envSky = createSkyEnvMap(renderer, this.port.sky, 0.9);
     this.port.group.visible = false;
     scene.add(this.port.group);
+
+    // har bir dunyoning o'z havosi (tuman), foni va muhit xaritasi
+    this.worlds = {
+      garage: { fog: new THREE.Fog(GARAGE_FOG.clone(), FOG_NEAR, FOG_FAR), background: GARAGE_FOG.clone(), env: null },
+      port: { fog: new THREE.Fog(PORT_HAZE.clone(), 160, 1600), background: PORT_HAZE.clone(), env: null },
+    };
+    this.buildEnvMaps();
+    this.fleet = new THREE.Group(); // garajdagi mashinalar
+    scene.add(this.fleet);
 
     this.container = createContainer();
     this.container.group.position.copy(G.container);
@@ -125,18 +200,22 @@ export class World {
     this.outline.position.set(0, 2.55, -3.9);
     this.garage.group.add(this.outline);
 
-    // post-processing
-    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: quality.msaa });
-    const composer = new EffectComposer(renderer, rt);
-    composer.setPixelRatio(quality.dpr);
-    composer.setSize(innerWidth, innerHeight);
-    composer.addPass(new RenderPass(scene, camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth / 2, innerHeight / 2), 0.16, 0.35, 1.6);
-    composer.addPass(this.bloom);
-    composer.addPass(new OutputPass());
-    this.grade = new ShaderPass(GradeShader);
-    composer.addPass(this.grade);
-    this.composer = composer;
+    this.setupPost();
+    this.setWorld('garage');
+
+    // GPU qayta ishga tushsa (drayver, xotira yetishmasligi) — sahna qayta tiklanadi
+    this.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      document.body.classList.add('gl-lost');
+    });
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      this.contextLost = false;
+      this.buildEnvMaps();
+      this.garage.anim.refreshShadows?.();
+      this.applyWorldState(this.blend >= 1 ? 'port' : 'garage');
+      document.body.classList.remove('gl-lost');
+    });
 
     // yuklash
     await this.loadAll();
@@ -147,6 +226,71 @@ export class World {
     this.resize();
     this.selectCar(this.selected, true);
     renderer.setAnimationLoop(() => this.tick());
+  }
+
+  /** Osmondan PMREM muhit xaritalari (kontekst tiklanganda qayta quriladi) */
+  buildEnvMaps() {
+    this.envYard?.dispose();
+    this.envSky?.dispose();
+    // garaj ichi ham hovli osmonidan olingan muhitni aks ettiradi: devorlar ko'kish-kulrang, akslar kontrastli
+    this.envYard = createSkyEnvMap(this.renderer, this.garage.anim.yardSky, 0.85);
+    this.envSky = createSkyEnvMap(this.renderer, this.port.sky, 0.9);
+    this.worlds.garage.env = this.envYard;
+    this.worlds.port.env = this.envSky;
+  }
+
+  setupPost() {
+    const { quality, renderer } = this;
+    const w = Math.max(1, Math.round(innerWidth * quality.dpr)), h = Math.max(1, Math.round(innerHeight * quality.dpr));
+    this.rtScene = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: quality.msaa });
+    this.rtAux = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false });
+    this.rtAux.texture.generateMipmaps = false;
+
+    // bloom chorak o'lchamda ishlaydi (arzon); high-pass 4 nuqtasi kadrning 4x4 pikselini qamraydi
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.16, 0.3, 5.5);
+    const hp = this.bloom.materialHighPassFilter;
+    hp.uniforms.uTexel = { value: new THREE.Vector2(2 / w, 2 / h) };
+    hp.fragmentShader = HIGHPASS_FRAG;
+    hp.needsUpdate = true;
+    this.bloom.enabled = false;
+
+    this.final = new THREE.RawShaderMaterial({
+      uniforms: THREE.UniformsUtils.clone(FinalShader.uniforms),
+      vertexShader: FinalShader.vertexShader,
+      fragmentShader: FinalShader.fragmentShader,
+      defines: { ACES_FILMIC_TONE_MAPPING: '', SRGB_TRANSFER: '' },
+      glslVersion: THREE.GLSL3,
+      depthTest: false, depthWrite: false,
+    });
+    this.finalQuad = new FullScreenQuad(this.final);
+    this.copyMat = new THREE.RawShaderMaterial({
+      uniforms: THREE.UniformsUtils.clone(BlendShader.uniforms),
+      vertexShader: BlendShader.vertexShader, fragmentShader: BlendShader.fragmentShader,
+      depthTest: false, depthWrite: false,
+    });
+    this.blendMat = this.copyMat.clone();
+    this.blendMat.transparent = true;
+    this.blendMat.blending = THREE.NormalBlending;
+    this.copyQuad = new FullScreenQuad(this.copyMat);
+    this.blendQuad = new FullScreenQuad(this.blendMat);
+    renderer.autoClear = true;
+  }
+
+  /** Qaysi dunyo chiziladi: ko'rinish, tuman, fon va muhit xaritasi */
+  setWorld(name) {
+    const inPort = name === 'port';
+    this.garage.group.visible = !inPort;
+    this.fleet.visible = !inPort;
+    this.port.group.visible = inPort;
+    this.spreader.group.visible = inPort && this.spreaderOn;
+    this.applyWorldState(name);
+  }
+
+  applyWorldState(name) {
+    const s = this.worlds[name];
+    this.scene.fog = s.fog;
+    this.scene.background = s.background;
+    this.scene.environment = s.env;
   }
 
   async loadAll() {
@@ -194,7 +338,7 @@ export class World {
       root.rotation.order = 'YXZ'; // yaw, keyin qiyalik
       root.position.set(slot.x, G.ttH, slot.z);
       root.rotation.y = slot.yaw;
-      this.scene.add(root);
+      this.fleet.add(root);
       return {
         car, model, mats, root, lift, spin, shadow, hit, size, slot, rig,
         hover: 0, spinAngle: 0, spinVel: 0, dim: 1,
@@ -254,22 +398,55 @@ export class World {
 
   resize() {
     const w = innerWidth, h = innerHeight;
+    const dpr = this.quality.dpr;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.projDirty = true;
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
-    this.composer.setSize(w, h);
-    this.bloom.setSize(w / 2, h / 2);
+    const pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
+    this.rtScene.setSize(pw, ph);
+    this.rtAux.setSize(pw, ph);
+    this.bloom.setSize(pw / 2, ph / 2);
+    this.bloom.materialHighPassFilter.uniforms.uTexel.value.set(2 / pw, 2 / ph);
     this.garage.floor.setSize(w, h);
     this.portrait = w / h < 0.95;
   }
 
   setActive(v) { this.active = v; }
 
+  /**
+   * Kadr juda sekin bo'lsa (kuchsiz GPU) — sifat bir pog'ona pasaytiriladi: avval MSAA, keyin piksel zichligi.
+   * Sekin kadrlar GPU'ni "qotirib", brauzer WebGL kontekstini tashlab yuborishiga (oq ekran) olib kelmasin.
+   */
+  adaptQuality(now) {
+    const pf = this.perf;
+    const dt = pf.last ? (now - pf.last) / 1000 : 1 / 60;
+    pf.last = now;
+    if (dt > 0.25) return; // fon tab / pauza — hisobga olinmaydi
+    pf.warm += dt;
+    pf.ema += (dt - pf.ema) * 0.05;
+    if (pf.warm < 4) return;  // birinchi soniyalar: shaderlar kompilyatsiyasi
+    pf.slowFor = pf.ema > 1 / 28 ? pf.slowFor + dt : 0;
+    if (pf.slowFor < 2.5) return;
+    pf.slowFor = 0;
+    pf.warm = 2;
+    const q = this.quality;
+    if (q.msaa > 0) {
+      q.msaa = q.msaa > 2 ? 2 : 0;
+      this.rtScene.dispose();
+      this.rtScene = new THREE.WebGLRenderTarget(this.rtAux.width, this.rtAux.height, { type: THREE.HalfFloatType, samples: q.msaa });
+    } else if (q.dpr > 0.8) {
+      q.dpr = Math.max(0.75, q.dpr * 0.82);
+      this.resize();
+    }
+  }
+
   tick() {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.time += dt;
-    if (!this.active) return;
+    if (!this.active || this.contextLost) return;
+    this.adaptQuality(performance.now());
 
     // scroll progressi — yumshoq
     const k = 1 - Math.exp(-dt * 7);
@@ -291,11 +468,42 @@ export class World {
     }
 
     this.story.update(this.p, dt, this.time);
-    this.grade.uniforms.uTime.value = this.time;
-    if (this.garage.group.visible) this.garage.anim.update(this.time, this.camera);
-    else this.port.update(this.time, this.camera, this.container.group.position);
-    this.composer.render();
+    if (this.blend < 1) this.garage.anim.update(this.time, this.camera);
+    if (this.blend > 0) this.port.update(this.time, this.camera, this.story.shadowFocus);
+    this.render();
     this.emit('frame', this.p);
+  }
+
+  render() {
+    const { renderer, scene, camera, rtScene } = this;
+    const k = this.blend;
+    if (k <= 0 || k >= 1) {
+      this.setWorld(k >= 1 ? 'port' : 'garage');
+      renderer.setRenderTarget(rtScene);
+      renderer.render(scene, camera);
+    } else {
+      // "match dissolve": konteyner ikkala kadrda bir joyda — atrofi hovlidan portga asta almashadi
+      this.setWorld('port');
+      renderer.setRenderTarget(rtScene);
+      renderer.render(scene, camera);
+      this.copyMat.uniforms.tDiffuse.value = rtScene.texture;
+      this.copyMat.uniforms.uOpacity.value = 1;
+      renderer.setRenderTarget(this.rtAux);
+      this.copyQuad.render(renderer);
+      this.setWorld('garage');
+      renderer.setRenderTarget(rtScene);
+      renderer.render(scene, camera);
+      this.blendMat.uniforms.tDiffuse.value = this.rtAux.texture;
+      this.blendMat.uniforms.uOpacity.value = k;
+      renderer.autoClear = false; // garaj kadri ustiga chiziladi
+      this.blendQuad.render(renderer);
+      renderer.autoClear = true;
+    }
+    if (this.bloom.enabled) this.bloom.render(renderer, null, rtScene, 0, false);
+    this.final.uniforms.tDiffuse.value = rtScene.texture;
+    this.final.uniforms.toneMappingExposure.value = renderer.toneMappingExposure;
+    renderer.setRenderTarget(null);
+    this.finalQuad.render(renderer);
   }
 
   /** 3D nuqtani ekran koordinatasiga */

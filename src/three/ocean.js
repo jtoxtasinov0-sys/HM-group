@@ -116,13 +116,18 @@ export function makeOceanNormalMap({ N = 256, L = 103, V = 9, wind = [0.86, 0.5]
  * Aks beruvchi okean: kema, kran va osmon suvda aks etadi (to'lqinlar bilan buziladi),
  * Frenel, quyosh yo'lakchasi, soyalar. three.js Water asosida, shaderi biroz boyitilgan:
  *  - uzoqda to'lqin normallari silliqlanadi (ufqda aliasing bo'lmasin, akslar tiniqroq);
- *  - suv rangi chuqur ko'k + to'lqin cho'qqilarida yorug'lik o'tishi (subsurface).
+ *  - suv rangi chuqur ko'k + to'lqin cho'qqilarida yorug'lik o'tishi (subsurface);
+ *  - aks 5 nuqtadan yumshatib o'qiladi: ingichka ustun/arqonlarning akslari harakatda jimirlamaydi;
+ *  - quyosh yaltirashi masofaga qarab yoyiladi va susayadi (uzoqdagi mayda to'lqinlar piksel ichida
+ *    o'rtachalanadi) — miltillovchi oq nuqtalar o'rniga yumshoq quyosh yo'lakchasi.
  */
-export function createOcean({ sunDir, sunColor = '#fff3df', waterColor = '#0b2c45', size = 9000, reflectRes = 512, y = 0 }) {
+export function createOcean({ sunDir, sunColor = '#fff3df', waterColor = '#0b2c45', size = 9000, reflectW = 512, reflectH = 512, y = 0 }) {
   const normals = makeOceanNormalMap();
-  const water = new Water(new THREE.PlaneGeometry(size, size), {
-    textureWidth: reflectRes,
-    textureHeight: reflectRes,
+  // tekislik bo'laklarga bo'lingan: 9 km li ikki uchburchakda chuqurlik (depth) aniqligi yetmasdi —
+  // kema korpusi, prichal devori va iz suv chizig'ida "jimirlardi" (z-fighting)
+  const water = new Water(new THREE.PlaneGeometry(size, size, 160, 160), {
+    textureWidth: reflectW,
+    textureHeight: reflectH,
     waterNormals: normals,
     sunDirection: sunDir.clone().normalize(),
     sunColor: new THREE.Color(sunColor),
@@ -132,17 +137,32 @@ export function createOcean({ sunDir, sunColor = '#fff3df', waterColor = '#0b2c4
     clipBias: 0.002,
   });
   const mat = water.material;
+  mat.uniforms.uMirrorTexel = { value: new THREE.Vector2(1 / reflectW, 1 / reflectH) };
   mat.fragmentShader = mat.fragmentShader
+    .replace('uniform sampler2D mirrorSampler;', 'uniform sampler2D mirrorSampler;\nuniform vec2 uMirrorTexel;')
     .replace('vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );', `
       float camDist = length( eye - worldPosition.xyz );
       vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
       surfaceNormal = normalize( mix( surfaceNormal, vec3( 0.0, 1.0, 0.0 ), smoothstep( 180.0, 2600.0, camDist ) * 0.72 ) );`)
+    .replace('sunLight( surfaceNormal, eyeDirection, 100.0, 2.0, 0.5, diffuseLight, specularLight );', `
+      float hmFar = smoothstep( 30.0, 900.0, camDist );
+      sunLight( surfaceNormal, eyeDirection, mix( 140.0, 26.0, hmFar ), mix( 1.5, 0.5, hmFar ), 0.5, diffuseLight, specularLight );
+      specularLight = min( specularLight, vec3( 2.5 ) );`)
+    .replace('vec3 reflectionSample = vec3( texture2D( mirrorSampler, mirrorCoord.xy / mirrorCoord.w + distortion ) );', `
+      vec2 hmRuv = mirrorCoord.xy / mirrorCoord.w + distortion;
+      vec2 hmT = uMirrorTexel * 1.25;
+      vec3 reflectionSample = texture2D( mirrorSampler, hmRuv ).rgb * 0.36
+        + texture2D( mirrorSampler, hmRuv + vec2( hmT.x, 0.0 ) ).rgb * 0.16
+        + texture2D( mirrorSampler, hmRuv - vec2( hmT.x, 0.0 ) ).rgb * 0.16
+        + texture2D( mirrorSampler, hmRuv + vec2( 0.0, hmT.y ) ).rgb * 0.16
+        + texture2D( mirrorSampler, hmRuv - vec2( 0.0, hmT.y ) ).rgb * 0.16;
+      reflectionSample = min( reflectionSample, vec3( 6.0 ) );`)
     .replace('vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;', `
       vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;
       // to'lqin yon tomonida quyosh nuri suv ichidan o'tadi (yashil-ko'k porlash)
       float sss = pow( max( 0.0, dot( eyeDirection, -sunDirection ) ), 3.0 ) * max( 0.0, surfaceNormal.x * 0.5 + surfaceNormal.z * 0.5 + 0.2 );
       scatter += vec3( 0.05, 0.22, 0.24 ) * sss * 0.6 + waterColor * 0.35;`);
-  mat.fragmentShader = mat.fragmentShader.replace('gl_FragColor = vec4( outgoingLight, alpha );', 'gl_FragColor = vec4( min( outgoingLight, vec3( 5.0 ) ), alpha );');
+  mat.fragmentShader = mat.fragmentShader.replace('gl_FragColor = vec4( outgoingLight, alpha );', 'gl_FragColor = vec4( min( outgoingLight, vec3( 4.0 ) ), alpha );');
   mat.uniforms.size.value = 1.0;
   water.rotation.x = -Math.PI / 2;
   water.position.y = y;

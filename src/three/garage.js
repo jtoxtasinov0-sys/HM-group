@@ -102,8 +102,10 @@ export function createGarage({ quality }) {
   const anim = {}; // story boshqaradigan qismlar
   const dimmable = []; // "teatr" rejimida xiralashadigan materiallar
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#dde2e7', map: makePlasterWallTexture(), roughness: 0.92, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.7 });
-  const ceilMat = new THREE.MeshStandardMaterial({ color: '#eef0f3', emissive: new THREE.Color('#dfe5ec'), emissiveIntensity: 0.16, roughness: 0.96, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.75 });
+  // Rang: mashina konteynerga chiqayotgandagi kabi — sovuq ko'kish-kulrang gips, oq "studiya" emas.
+  // Yorug'lik markazda (tom-oyna ostida) yig'iladi, devorlar chetga qarab to'qlashadi — chuqurlik va kontrast
+  const wallMat = new THREE.MeshStandardMaterial({ color: '#c6cbd2', map: makePlasterWallTexture(), roughness: 0.92, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.55 });
+  const ceilMat = new THREE.MeshStandardMaterial({ color: '#ccd2d9', emissive: new THREE.Color('#c9d0d9'), emissiveIntensity: 0.08, roughness: 0.96, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.6 });
   ceilingGradient(ceilMat);
   const metalMat = new THREE.MeshStandardMaterial({ color: '#c6ccd3', map: makeGrimeTexture(23), roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 });
   dimmable.push(wallMat, ceilMat, metalMat);
@@ -112,11 +114,11 @@ export function createGarage({ quality }) {
   const ft = makePolishedFloorTextures();
   const depth = G.frontZ - G.wallZ;
   const floor = createGlossyFloor({
-    width: G.halfW * 2, depth, color: new THREE.Color('#c9ced4'), map: ft.map, roughnessMap: ft.roughnessMap, repeat: depth / 8,
-    roughness: 1, strength: quality.reflections ? 0.4 : 0, resolution: quality.reflectionRes, reflect: quality.reflections, seams: false,
+    width: G.halfW * 2, depth, color: new THREE.Color('#b4bcc6'), map: ft.map, roughnessMap: ft.roughnessMap, repeat: depth / 8,
+    roughness: 1, strength: quality.reflections ? 0.55 : 0, resolution: quality.reflectionRes, reflect: quality.reflections, seams: false,
   });
   floor.mesh.position.set(0, 0, (G.frontZ + G.wallZ) / 2);
-  floor.mesh.material.envMapIntensity = 0.85;
+  floor.mesh.material.envMapIntensity = 0.7;
   floor.mesh.receiveShadow = true;
   dimmable.push(floor.mesh.material);
   group.add(floor.mesh);
@@ -133,7 +135,7 @@ export function createGarage({ quality }) {
   for (const m of [wallLow, wallHigh, front]) { m.castShadow = m.receiveShadow = true; group.add(m); }
   // devor pastidagi ingichka soya tirqishi (pol va devor ajralib tursin)
   group.add(new THREE.Mesh(wallStrip(outline(160, 0.015), 0, 0.045, { skip: inDoor }),
-    new THREE.MeshStandardMaterial({ color: '#9aa2ad', roughness: 0.8, side: THREE.DoubleSide })));
+    new THREE.MeshStandardMaterial({ color: '#79838f', roughness: 0.8, side: THREE.DoubleSide })));
 
   // ---------- SHIFT + katta tom-oyna ----------
   const shape = new THREE.Shape(pts.map((p) => new THREE.Vector2(p.x, -p.y)));
@@ -206,7 +208,7 @@ export function createGarage({ quality }) {
     centers.push({ p, n, hide: Math.abs(p.x) < 5.6 || p.y > G.frontZ - 2 });
   }
   const scallopMat = new THREE.MeshBasicMaterial({
-    map: makeScallopTexture(), color: hdr('#fff3e4', 0.8), blending: THREE.AdditiveBlending,
+    map: makeScallopTexture(), color: hdr('#fff3e4', 0.95), blending: THREE.AdditiveBlending,
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
   const scTop = G.ceilY - 0.02, scBot = G.ceilY - 4.4;
@@ -313,9 +315,10 @@ export function createGarage({ quality }) {
   anim.yardSky = yard.sky;
 
   // ---------- YORUG'LIK ----------
-  const hemi = new THREE.HemisphereLight('#ffffff', '#b9c0ca', 0.5);
+  const HEMI = 0.56, KEY = 0.55;
+  const hemi = new THREE.HemisphereLight('#e9edf2', '#8f97a2', HEMI);
   group.add(hemi);
-  const key = new THREE.DirectionalLight('#ffffff', 0.5);
+  const key = new THREE.DirectionalLight('#f6f7f9', KEY);
   key.position.set(4, 12, 10);
   group.add(key);
   // katta doira ostidagi yumshoq yorug'lik "hovuzi" — mashinalarga yumshoq soya beradi
@@ -356,6 +359,8 @@ export function createGarage({ quality }) {
     sun.intensity = 2.6 * k;
     sun.shadow.autoUpdate = k > 0.001;
   };
+  // GPU konteksti tiklanganda soya xaritasi qayta chiziladi
+  anim.refreshShadows = () => { sun.shadow.needsUpdate = true; };
 
   const skyBase = skyMat.color.clone();
   const dlBase = dlMat.color.clone();
@@ -366,8 +371,8 @@ export function createGarage({ quality }) {
   anim.ambient = (k) => {
     if (Math.abs(k - lastAmb) < 0.002) return;
     lastAmb = k;
-    hemi.intensity = 0.5 * k;
-    key.intensity = 0.5 * k;
+    hemi.intensity = HEMI * k;
+    key.intensity = KEY * k;
     skySpot.intensity = 55 * (0.5 + 0.5 * k);
     for (const m of dimmable) m.envMapIntensity = m.userData.baseEnv * k;
     skyMat.color.copy(skyBase).multiplyScalar(0.55 + 0.45 * k);

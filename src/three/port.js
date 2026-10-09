@@ -96,6 +96,9 @@ export function prepareShip(ship, holder) {
     const m = o.material;
     m.envMapIntensity = 1;
     if (m.metalness > 0.5) m.metalness = 0.4; // bo'yalgan po'lat
+    // panjaralar (ingichka to'r): oppoq rang qora korpus ustida har kichik siljishda "jimirlardi" —
+    // haqiqiy kemadagidek kulrang bo'yalgan po'lat, kontrasti past
+    if (m.name === 'acmat_36') m.color.set('#848b92');
     m.onBeforeCompile = (s) => inject(s, true);
     m.customProgramCacheKey = () => 'ship-real';
     m.needsUpdate = true;
@@ -119,42 +122,89 @@ export function prepareShip(ship, holder) {
   };
 }
 
-/** Ko'pik — kema orqasida (Kelvin izi) */
+/**
+ * Kema orqasidagi iz: vint aralashtirgan och-firuza suv va siyrak ko'pik. Sekin yurayotgan yuk kemasida
+ * yorqin oq "Kelvin chiziqlari" bo'lmaydi — faqat yumshoq, kengayib so'nuvchi iz.
+ *  - Ko'pik dunyo koordinatasida: kema ketadi, ko'pik suvda qoladi (kema bilan birga sirpanmaydi).
+ *  - Shovqin oktavalari ekrandagi o'lchamiga qarab so'ndiriladi (fwidth): uzoqda mayda naqsh miltillamaydi.
+ *  - pow() manfiy son bilan chaqirilmaydi — ayrim GPU'larda NaN beradi va kadr buziladi.
+ */
+const WAKE_LEN = 320;
 function makeWake() {
-  const uniforms = { uTime: { value: 0 }, uSpeed: { value: 0 } };
+  const uniforms = {
+    uTime: { value: 0 }, uSpeed: { value: 0 },
+    uShipX: { value: 0 }, uSternZ: { value: 0 }, uStartZ: { value: 0 },
+  };
   const mat = new THREE.ShaderMaterial({
     uniforms,
     transparent: true,
     depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
     vertexShader: /* glsl */`
-      varying vec2 vUv;
-      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: /* glsl */`
-      varying vec2 vUv;
-      uniform float uTime; uniform float uSpeed;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
-      float noise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
-        return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
-      float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+      varying vec3 vW;
       void main() {
-        // y: 0 — kema dumi, 1 — iz oxiri; x: -1..1 kenglik bo'ylab
-        float y = vUv.y;
-        float x = (vUv.x - 0.5) * 2.0;
-        float ax = abs(x);
-        vec2 q = vec2(x * 9.0, y * 60.0 + uTime * 0.35);
-        float n = fbm(q);
-        float w = 0.05 + 0.16 * pow(y, 0.7);
-        float core = (1.0 - smoothstep(w * 0.4, w, ax)) * pow(1.0 - y, 1.6);
-        float arm = 0.07 + 0.85 * y;
-        float wing = exp(-pow((ax - arm) / (0.012 + 0.03 * y), 2.0)) * pow(1.0 - y, 2.2) * 0.7;
-        float a = (core * smoothstep(0.35, 0.75, n + 0.15) + wing * smoothstep(0.3, 0.7, n)) * smoothstep(0.0, 0.015, y);
-        gl_FragColor = vec4(vec3(0.92, 0.95, 0.97), a * uSpeed * 0.8);
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vW = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vW;
+      uniform float uTime, uSpeed, uShipX, uSternZ, uStartZ;
+      float hash(vec2 p) { vec3 q = fract(p.xyx * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+      float vnoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      // ekranda pikseldan mayda bo'lib qolgan oktavalar o'rtacha qiymatga (0.5) so'nadi
+      float fbmAA(vec2 p) {
+        float fw = max(length(fwidth(p)), 1e-4);
+        float s = 0.0, a = 0.5, f = 1.0, norm = 0.0;
+        for (int i = 0; i < 4; i++) {
+          float k = 1.0 - smoothstep(0.25, 0.6, fw * f);
+          s += a * mix(0.5, vnoise(p * f + float(i) * 17.3), k);
+          norm += a; a *= 0.5; f *= 2.07;
+        }
+        return s / norm;
+      }
+      void main() {
+        float behind = uSternZ - vW.z;                 // kema dumidan necha metr orqada
+        float travelled = max(uSternZ - uStartZ, 0.0); // kema shu paytgacha bosib o'tgan yo'l
+        float x = vW.x - uShipX;
+        float halfW = 5.0 + max(behind, 0.0) * 0.085;  // iz sekin kengayadi
+        float across = x / halfW;
+        float core = exp(-across * across * 2.0);
+        float age = exp(-max(behind, 0.0) / 120.0);
+        float fade = smoothstep(0.0, 8.0, behind) * smoothstep(0.0, 30.0, travelled - behind);
+        float n = fbmAA(vW.xz * 0.085 + vec2(0.0, uTime * 0.04));
+        float foam = smoothstep(0.52, 0.8, n + 0.22 * core * age);
+        vec3 churn = vec3(0.30, 0.45, 0.48);            // havo pufakli och-firuza suv
+        vec3 froth = vec3(0.78, 0.83, 0.85);            // ko'pik (tone mappingdan oldin — o'rtacha yorqin)
+        vec3 col = mix(churn, froth, foam * age);
+        float a = core * age * fade * (0.3 + 0.45 * foam);
+        gl_FragColor = vec4(col, clamp(a * uSpeed, 0.0, 0.6));
       }`,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(130, 420, 1, 1), mat);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(90, WAKE_LEN, 1, 1), mat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = P.waterY + 0.05;
-  return { mesh, uniforms };
+  mesh.renderOrder = 1;
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  return {
+    mesh,
+    uniforms,
+    /** x — kema o'qi, sternZ — kema dumi (hozir), startZ — dumning prichaldagi joyi, speed — 0..1 */
+    update(x, sternZ, startZ, speed) {
+      mesh.position.set(x, P.waterY + 0.05, sternZ - WAKE_LEN / 2);
+      uniforms.uShipX.value = x;
+      uniforms.uSternZ.value = sternZ;
+      uniforms.uStartZ.value = startZ;
+      uniforms.uSpeed.value = speed;
+      mesh.visible = speed > 0.001 && sternZ - startZ > 0.5;
+    },
+  };
 }
 
 /** Prichal: beton maydon, chet (koping), rezina amortizatorlar, bollardlar, kran relslari, chiziqlar */
@@ -285,23 +335,39 @@ export function createPort({ quality }) {
   const sky = createSky({ sunDir: P.sunDir, clouds: 0.4, gain: 1.0, ground: '#1d3550' });
   group.add(sky.mesh);
 
-  const ocean = createOcean({ sunDir: P.sunDir, y: P.waterY, reflectRes: quality.mobile ? 256 : 512 });
+  // aks teksturasi ekran nisbatida (kvadrat 512 kenglikda 3 baravar siqardi — ingichka ustunlar akslari jimirlardi)
+  const rw = Math.round(Math.min(1024, Math.max(384, innerWidth * (quality.mobile ? 0.4 : 0.55))));
+  const rh = Math.round(rw * Math.min(1.6, Math.max(0.45, innerHeight / innerWidth)));
+  const ocean = createOcean({ sunDir: P.sunDir, y: P.waterY, reflectW: rw, reflectH: rh });
   group.add(ocean.mesh);
   const wake = makeWake();
   group.add(wake.mesh);
+  // suvdagi aks: quyosh diski (dumaloq "chiroq" bo'lib ko'rinardi) va izning o'zi aks ettirilmaydi —
+  // quyosh yo'lakchasini suv shaderining o'zi to'lqinlar bo'yicha chizadi
+  const waterBefore = ocean.mesh.onBeforeRender;
+  ocean.mesh.onBeforeRender = function (...args) {
+    const wakeVis = wake.mesh.visible;
+    wake.mesh.visible = false;
+    sky.uniforms.uSunScale.value = 0;
+    waterBefore.apply(this, args);
+    sky.uniforms.uSunScale.value = 1;
+    wake.mesh.visible = wakeVis;
+  };
 
   group.add(makeQuay(quality));
   const crane = createCrane({ zc: G.container.z, legX: P.craneLegX, half: P.craneHalfGauge, boomY: P.boomY });
   if (!quality.shadows) crane.group.traverse((o) => { o.castShadow = false; });
   group.add(crane.group);
 
-  // quyosh (soya beradi) — soya kamerasi har kadrda harakat markaziga suriladi
+  // quyosh (soya beradi) — soya kamerasi harakat markaziga suriladi (piksellarga yopishtirilgan).
+  // Kema quyosh tomon suzadi: yo'nalishi deyarli nur bo'ylab, shuning uchun suzish paytida soya kamerasi
+  // joyida qoladi (±70 m kema oxirigacha sig'adi) — prichal va kran soyalari "o'chib-yonmaydi"
   const sun = new THREE.DirectionalLight('#ffe7c8', 3.4);
   sun.castShadow = quality.shadows;
   if (quality.shadows) {
     sun.shadow.mapSize.set(2048, 2048);
     const sc = sun.shadow.camera;
-    sc.left = -55; sc.right = 55; sc.top = 55; sc.bottom = -55; sc.near = 1; sc.far = 420;
+    sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 1; sc.far = 460;
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.05;
     sun.shadow.radius = 2.5;
@@ -314,13 +380,17 @@ export function createPort({ quality }) {
   group.add(shipHolder);
   let shipPrep = null;
 
-  return {
+  const api = {
     group, sky, ocean, wake, crane, shipHolder, sun,
+    sternZ: -67, // kema dumi (holder koordinatasida) — model yuklangach aniqlanadi
     /** yuklangan kema modelini joyiga qo'yadi (burni +Z tomonga) */
     setShip(ship) {
       ship.rotation.y = Math.PI;
       shipPrep = prepareShip(ship, shipHolder);
       shipHolder.add(ship);
+      shipHolder.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(ship);
+      api.sternZ = box.min.z - shipHolder.position.z;
     },
     /** focus — soya kamerasining markazi (konteyner / kema) */
     update(time, camera, focus) {
@@ -337,8 +407,9 @@ export function createPort({ quality }) {
         const v = Math.round(focus.dot(SUN_Y) / texel) * texel;
         const w = focus.dot(P.sunDir);
         sun.target.position.set(0, 0, 0).addScaledVector(SUN_X, u).addScaledVector(SUN_Y, v).addScaledVector(P.sunDir, w);
-        sun.position.copy(sun.target.position).addScaledVector(P.sunDir, 220);
+        sun.position.copy(sun.target.position).addScaledVector(P.sunDir, 260);
       }
     },
   };
+  return api;
 }
