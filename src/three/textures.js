@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HM_W, HM_H, HM_D } from '../logo.js';
 
 export const BRAND = {
   navy: '#1D3E69',
@@ -7,7 +8,7 @@ export const BRAND = {
   white: '#FFFFFF',
 };
 
-const FONT = 'Montserrat, "Segoe UI", Arial, sans-serif';
+export const FONT = 'Inter, "Segoe UI", Arial, sans-serif';
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -23,40 +24,40 @@ function tex(c, { srgb = true, repeat = false, aniso = 8 } = {}) {
   return t;
 }
 
-/** "HM" belgisi — ingichka geometrik chiziqlar (logo bilan bir xil) */
-export function drawHM(ctx, cx, cy, size, color, lineWidth) {
-  const s = size / 46; // logo 46 birlik kenglikda
+const HM_PATH = new Path2D(HM_D);
+
+/** "HM" logotipi (src/logo.js) — to'liq bo'yalgan. (cx, cy) — markaz, width — kengligi */
+export function drawHM(ctx, cx, cy, width, color) {
+  const s = width / HM_W;
   ctx.save();
-  ctx.translate(cx - 23 * s, cy - 14 * s);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'square';
-  ctx.lineJoin = 'miter';
-  ctx.beginPath();
-  // H
-  ctx.moveTo(0, 0); ctx.lineTo(0, 28 * s);
-  ctx.moveTo(0, 14 * s); ctx.lineTo(16 * s, 14 * s);
-  ctx.moveTo(16 * s, 0); ctx.lineTo(16 * s, 28 * s);
-  // M
-  ctx.moveTo(26 * s, 28 * s); ctx.lineTo(26 * s, 0); ctx.lineTo(36 * s, 18 * s); ctx.lineTo(46 * s, 0); ctx.lineTo(46 * s, 28 * s);
-  ctx.stroke();
+  ctx.translate(cx - (HM_W * s) / 2, cy - (HM_H * s) / 2);
+  ctx.scale(s, s);
+  ctx.fillStyle = color;
+  ctx.fill(HM_PATH);
   ctx.restore();
 }
 
-/** Devordagi yorug' logo: doira + HM + GROUP yozuvi */
+/** HM belgisi ostida keng "GROUP" yozuvi (logo kengligiga cho'zilgan) */
+function drawGroupWord(ctx, cx, y, width, size, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `600 ${size}px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const word = 'GROUP';
+  const letters = [...word].map((ch) => ctx.measureText(ch).width);
+  const gap = (width - letters.reduce((a, b) => a + b, 0)) / (word.length - 1);
+  let x = cx - width / 2;
+  [...word].forEach((ch, i) => { ctx.fillText(ch, x, y); x += letters[i] + gap; });
+  ctx.restore();
+}
+
+/** Devordagi yorug' logo: HM belgisi + GROUP yozuvi */
 export function makeWallLogoTexture() {
   const [c, ctx] = canvas(2048, 1024);
   ctx.clearRect(0, 0, 2048, 1024);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 7;
-  ctx.beginPath(); ctx.arc(1024, 400, 300, 0, Math.PI * 2); ctx.stroke();
-  drawHM(ctx, 1024, 400, 330, '#fff', 16);
-  ctx.fillStyle = '#fff';
-  ctx.font = `300 112px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '42px';
-  ctx.fillText('HM GROUP', 1024 + 21, 860);
+  drawHM(ctx, 1024, 430, 1000, '#fff');
+  drawGroupWord(ctx, 1024, 800, 1000, 120, '#fff');
   return tex(c);
 }
 
@@ -65,17 +66,20 @@ export function makeOutlineTextTexture(text) {
   const [c, ctx] = canvas(2048, 512);
   ctx.clearRect(0, 0, 2048, 512);
   let size = 380;
-  ctx.font = `200 ${size}px ${FONT}`;
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '18px';
+  ctx.font = `600 ${size}px ${FONT}`;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
   while (ctx.measureText(text).width > 1920 && size > 120) {
     size -= 10;
-    ctx.font = `200 ${size}px ${FONT}`;
+    ctx.font = `600 ${size}px ${FONT}`;
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 6;
   ctx.strokeText(text, 1024, 270);
+  // shrift konturlari bir-birini kesib o'tadi — harf ichidagi chiziqlar o'chiriladi, faqat tashqi chegara qoladi
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillText(text, 1024, 270);
   return tex(c);
 }
 
@@ -138,18 +142,10 @@ export function makeContainerDecal() {
   const [c, ctx] = canvas(2480, 1000);
   ctx.clearRect(0, 0, 2480, 1000);
   ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#ffffff';
-  // logo doira
-  ctx.lineWidth = 11;
-  ctx.beginPath(); ctx.arc(760, 500, 215, 0, Math.PI * 2); ctx.stroke();
-  drawHM(ctx, 760, 500, 230, '#ffffff', 15);
+  // logo: HM belgisi + GROUP
+  drawHM(ctx, 980, 430, 1060, '#ffffff');
+  drawGroupWord(ctx, 980, 790, 1060, 118, '#ffffff');
   ctx.textBaseline = 'middle';
-  ctx.font = `300 250px ${FONT}`;
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
-  ctx.fillText('HM', 1060, 420);
-  ctx.font = `300 112px ${FONT}`;
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '30px';
-  ctx.fillText('GROUP', 1068, 640);
   // kichik texnik yozuvlar
   if ('letterSpacing' in ctx) ctx.letterSpacing = '6px';
   ctx.font = `500 52px ${FONT}`;
@@ -209,10 +205,7 @@ export function makeContainerDoorDecal() {
   ctx.font = `400 34px ${FONT}`;
   const lines = ['MAX.GROSS  30,480 KG', 'TARE        2,230 KG', 'NET        28,250 KG', 'CU.CAP.     33.2 CU.M'];
   lines.forEach((l, i) => ctx.fillText(l, 90, 200 + i * 52));
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#fff';
-  ctx.beginPath(); ctx.arc(820, 820, 110, 0, Math.PI * 2); ctx.stroke();
-  drawHM(ctx, 820, 820, 120, '#fff', 8);
+  drawHM(ctx, 790, 840, 300, '#fff');
   wearPaint(ctx, 1024, 1024, 72);
   return tex(c);
 }

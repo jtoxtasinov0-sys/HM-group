@@ -58,6 +58,9 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
 | Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`, `IG`) |
 | Ranglar | `src/styles.css` (`:root`) |
+| Shrift (Inter) | `index.html` (Google Fonts) va `src/styles.css` (`--font`) |
+| Logotip (HM belgisi) | `src/logo.js` — sayt, 3D sahna va ikonkalar shu shakldan chiziladi |
+| Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |
 
 **Muhim:** `src/data/cars.js` dagi mashinalar va "Sotildi" ro'yxati **namuna**.
 Haqiqiy sotuvdagi mashinalar va haqiqiy sotilganlar bilan almashtiring.
@@ -92,6 +95,7 @@ Kuzov rangi: `paint` (`pearl`, `navy`, `obsidian`, `silver`, `ice`, `graphite` �
 ```
 index.html              — sahifa
 src/main.js             — skroll, tillar, katalog, overlaylar
+src/logo.js             — HM logotipi (SVG path)
 src/styles.css          — dizayn
 src/i18n.js             — UZ / RU matnlar
 src/data/cars.js        — mashinalar

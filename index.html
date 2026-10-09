@@ -26,19 +26,31 @@
   <meta name="twitter:description" content="Biz — Koreyada. Hamkorlarimiz — butun dunyoda." />
   <meta name="twitter:image" content="%SITE_URL%/og.jpg" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/styles.css" />
 </head>
 <body class="is-loading">
 
+  <!-- HM logotipi (src/logo.js bilan bir xil): <use href="#hm-logo"> orqali hamma joyda ishlatiladi -->
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="hm-logo" viewBox="0 0 634 200">
+      <path d="M0 0H36V200H0ZM255 0H291V200H255V116H58L77 84H255ZM314 52L349.5 81.5V200H314ZM314 0H342.5L471.5 107.5L600.5 0H634V200H598V47L472 154L314 21.5Z" />
+    </symbol>
+  </svg>
+
   <!-- ============ PRELOADER ============ -->
   <div class="loader" id="loader" aria-live="polite">
     <div class="loader__inner">
-      <svg class="loader__logo" viewBox="0 0 100 100" aria-hidden="true">
-        <circle class="loader__ring" cx="50" cy="50" r="48" />
-        <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
+      <svg class="loader__logo" viewBox="0 0 634 200" aria-hidden="true">
+        <path d="M0 0H36V200H0Z" />
+        <path d="M255 0H291V200H255V116H58L77 84H255Z" />
+        <path d="M314 52L349.5 81.5V200H314Z" />
+        <path d="M314 0H342.5L471.5 107.5L600.5 0H634V200H598V47L472 154L314 21.5Z" />
       </svg>
       <div class="loader__bar"><span id="loaderBar"></span></div>
       <div class="loader__meta"><span data-i18n="loader.text">Garaj tayyorlanmoqda</span><span id="loaderPct">0%</span></div>
@@ -48,11 +60,8 @@
   <!-- ============ HEADER ============ -->
   <header class="nav" id="nav">
     <a class="nav__brand" href="#top" aria-label="HM Group">
-      <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="50" fill="#1D3E69" />
-        <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
-      </svg>
-      <span class="nav__word">HM GROUP</span>
+      <svg class="logo" viewBox="0 0 634 200" aria-hidden="true"><use href="#hm-logo" /></svg>
+      <span class="nav__word">GROUP</span>
     </a>
     <nav class="nav__links" id="navLinks">
       <a href="#sotuvda" data-i18n="nav.sale">Sotuvda</a>
@@ -330,10 +339,10 @@
   <footer class="footer">
     <div class="wrap footer__inner">
       <div class="footer__brand">
-        <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="49" fill="none" stroke="#fff" stroke-width="1.5" />
-          <g class="hm-mark"><path d="M27 36v28M27 50h16M43 36v28" /><path d="M53 64V36l10 18 10-18v28" /></g>
-        </svg>
+        <a class="footer__logo" href="#top" aria-label="HM Group">
+          <svg class="logo" viewBox="0 0 634 200" aria-hidden="true"><use href="#hm-logo" /></svg>
+          <span>GROUP</span>
+        </a>
         <p data-i18n="footer.slogan"></p>
       </div>
       <nav class="footer__links">

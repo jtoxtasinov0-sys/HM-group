@@ -272,7 +272,7 @@ const setLoad = (k) => {
 
 async function boot() {
   try {
-    await document.fonts.load('200 100px Montserrat').catch(() => {});
+    await document.fonts.load('600 100px Inter').catch(() => {});
     const manifest = await fetch(`${BASE}models/manifest.json`).then((r) => r.json());
     const quality = detectQuality();
     world = new World($('#webgl'), { cars: CARS, manifest, quality, onProgress: setLoad });

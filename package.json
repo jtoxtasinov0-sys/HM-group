@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "models": "node tools/optimize-models.mjs",
+    "icons": "node tools/icons.mjs",
     "deploy": "node tools/deploy.mjs",
     "deploy:github": "node tools/deploy-github.mjs"
   },

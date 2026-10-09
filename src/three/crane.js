@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { makeGrimeTexture } from './textures.js';
+import { makeGrimeTexture, drawHM, FONT } from './textures.js';
+import { HM_W, HM_H } from '../logo.js';
 
 /**
  * Konteyner krani (STS — "ship-to-shore") — haqiqiy port kranining tuzilishi:
@@ -215,7 +216,7 @@ export function createCrane({ zc, legX = [-12, 10], half = 11, boomY = 41 }) {
   // ---------- strela yon tomonidagi brend yozuvi ----------
   const brand = new THREE.Mesh(
     new THREE.PlaneGeometry(22, 5.5),
-    new THREE.MeshStandardMaterial({ alphaMap: solidTextTexture('HM GROUP'), color: '#1D3E69', transparent: true, roughness: 0.5, depthWrite: false }),
+    new THREE.MeshStandardMaterial({ alphaMap: solidLogoTexture(), color: '#1D3E69', transparent: true, roughness: 0.5, depthWrite: false }),
   );
   brand.position.set(-8, boomY, zc + gZ + gW / 2 + 0.13);
   group.add(brand);
@@ -247,17 +248,20 @@ export function createCrane({ zc, legX = [-12, 10], half = 11, boomY = 41 }) {
   return { group, trolley, ropeTop: gTop + 0.5 };
 }
 
-/** To'liq bo'yalgan (konturli emas) yozuv — alphaMap uchun */
-function solidTextTexture(text) {
+/** To'liq bo'yalgan logo: HM belgisi + GROUP (harflar balandligi belgiga teng) — alphaMap uchun */
+function solidLogoTexture() {
   const c = document.createElement('canvas');
   c.width = 2048; c.height = 512;
   const ctx = c.getContext('2d');
+  const h = 200, w = (HM_W / HM_H) * h, gap = 110;
+  ctx.font = `600 ${Math.round(h / 0.727)}px ${FONT}`; // Inter: bosh harf balandligi ≈ 0.727em
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '20px';
+  const textW = ctx.measureText('GROUP').width;
+  const x0 = (2048 - (w + gap + textW)) / 2, base = 256 + h / 2;
+  drawHM(ctx, x0 + w / 2, 256, w, '#fff');
   ctx.fillStyle = '#fff';
-  ctx.font = '500 300px Montserrat, "Segoe UI", Arial, sans-serif';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '40px';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 1024, 270);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('GROUP', x0 + w + gap, base);
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = 8;
   return t;
