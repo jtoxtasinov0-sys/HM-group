@@ -65,6 +65,7 @@
     </a>
     <nav class="nav__links" id="navLinks">
       <a href="#sotuvda" data-i18n="nav.sale">Sotuvda</a>
+      <a href="#obzorlar" data-i18n="nav.reviews">Obzorlar</a>
       <a href="#sotildi" data-i18n="nav.sold">Sotildi</a>
       <a href="#mijozlar" data-i18n="nav.clients">Mijozlar</a>
       <a href="#biz-haqimizda" data-i18n="nav.about">Biz haqimizda</a>
@@ -189,10 +190,26 @@
           <button type="button" class="chip is-active" data-filter="all" data-i18n="filter.all">Barchasi</button>
           <button type="button" class="chip" data-filter="suv" data-i18n="filter.suv">SUV</button>
           <button type="button" class="chip" data-filter="sedan" data-i18n="filter.sedan">Sedan</button>
-          <button type="button" class="chip" data-filter="van" data-i18n="filter.van">Miniven</button>
-          <button type="button" class="chip" data-filter="ev" data-i18n="filter.ev">Elektr</button>
+          <button type="button" class="chip" data-filter="sport" data-i18n="filter.sport">Sport</button>
         </div>
         <div class="grid cards" id="catalog"></div>
+      </div>
+    </section>
+
+    <!-- ============ OBZORLAR (Instagram Reels) ============ -->
+    <section class="section section--navy" id="obzorlar">
+      <div class="wrap">
+        <header class="sec-head sec-head--row reveal">
+          <div>
+            <span class="eyebrow" data-i18n="reels.eyebrow">Instagram Reels</span>
+            <h2 class="sec-title sec-title--light" data-i18n="reels.title">Video obzorlar</h2>
+          </div>
+          <p class="sec-text sec-text--light" data-i18n="reels.text"></p>
+        </header>
+      </div>
+      <div class="reels" id="reels"></div>
+      <div class="wrap center reveal">
+        <a class="btn btn--light" href="https://www.instagram.com/hmgroup.uz/reels/" target="_blank" rel="noopener" data-i18n="reels.more">Barcha obzorlar — Instagram'da</a>
       </div>
     </section>
 
@@ -347,6 +364,7 @@
       </div>
       <nav class="footer__links">
         <a href="#sotuvda" data-i18n="nav.sale"></a>
+        <a href="#obzorlar" data-i18n="nav.reviews"></a>
         <a href="#sotildi" data-i18n="nav.sold"></a>
         <a href="#mijozlar" data-i18n="nav.clients"></a>
         <a href="#biz-haqimizda" data-i18n="nav.about"></a>

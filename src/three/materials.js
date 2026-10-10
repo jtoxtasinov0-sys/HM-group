@@ -8,7 +8,10 @@ export const PAINTS = {
   obsidian: { color: '#0a0c10', metalness: 0.5,  roughness: 0.32, clearcoatRoughness: 0.02 },
   silver:   { color: '#b4bcc7', metalness: 0.88, roughness: 0.27, clearcoatRoughness: 0.03 },
   ice:      { color: '#a9c1dc', metalness: 0.7,  roughness: 0.3,  clearcoatRoughness: 0.03 },
-  graphite: { color: '#323a45', metalness: 0.72, roughness: 0.32, clearcoatRoughness: 0.025 },
+  // Haqiqiy metallik bo'yoq: rangli asos (metallik o'rtacha, biroz xira) + ustida yaltiroq lak.
+  // Metallik juda yuqori bo'lsa, kuzov rangi o'rniga garajning qorong'i akslari dog'-dog' bo'lib ko'rinadi.
+  graphite: { color: '#2c343f', metalness: 0.45, roughness: 0.4,  clearcoatRoughness: 0.03 },
+  sapphire: { color: '#10264a', metalness: 0.5,  roughness: 0.38, clearcoatRoughness: 0.025 }, // Rolls-Royce "Midnight Sapphire"
 };
 
 export function makePaint(key) {

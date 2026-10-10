@@ -2,6 +2,7 @@
 export const DICT = {
   uz: {
     'nav.sale': 'Sotuvda',
+    'nav.reviews': 'Obzorlar',
     'nav.sold': 'Sotildi',
     'nav.clients': 'Mijozlar',
     'nav.about': 'Biz haqimizda',
@@ -31,6 +32,9 @@ export const DICT = {
     'spec.new': 'Yangi · 0 km',
     'spec.price': 'Narx — so\'rov bo\'yicha',
     'spec.cta': 'Ma\'lumot olish',
+    'spec.ask': 'To\'liq ma\'lumot — so\'rov bo\'yicha',
+    'gallery.prev': 'Oldingi rasm',
+    'gallery.next': 'Keyingi rasm',
     'spec.selected': 'Tanlangan avtomobil',
 
     'ch1.num': '01 — Konteyner',
@@ -60,12 +64,19 @@ export const DICT = {
 
     'sale.eyebrow': 'Katalog',
     'sale.title': 'Sotuvda',
-    'sale.text': 'Koreyadan yetkaziladigan avtomobillar. Narx va mavjudlikni bilish uchun «Ma\'lumot olish»ni bosing.',
+    'sale.text': 'Koreyadagi avtomobillarimiz — Instagram\'dagi e\'lonlardan. Rasmlarni suring, narx va mavjudlikni bilish uchun «Ma\'lumot olish»ni bosing.',
     'filter.all': 'Barchasi',
     'filter.suv': 'SUV',
     'filter.sedan': 'Sedan',
     'filter.van': 'Miniven',
     'filter.ev': 'Elektr',
+    'filter.sport': 'Sport',
+
+    'reels.eyebrow': 'Instagram Reels',
+    'reels.title': 'Video obzorlar',
+    'reels.text': 'Mashinalarimiz videoda. Videoni bosing — Instagram\'da ochiladi.',
+    'reels.open': 'Instagram\'da ochish',
+    'reels.more': 'Barcha obzorlar — Instagram\'da',
 
     'sold.eyebrow': 'Portfolio',
     'sold.title': 'Sotildi',
@@ -120,6 +131,7 @@ export const DICT = {
 
   ru: {
     'nav.sale': 'В продаже',
+    'nav.reviews': 'Обзоры',
     'nav.sold': 'Продано',
     'nav.clients': 'Клиенты',
     'nav.about': 'О нас',
@@ -149,6 +161,9 @@ export const DICT = {
     'spec.new': 'Новый · 0 км',
     'spec.price': 'Цена — по запросу',
     'spec.cta': 'Узнать подробнее',
+    'spec.ask': 'Подробности — по запросу',
+    'gallery.prev': 'Предыдущее фото',
+    'gallery.next': 'Следующее фото',
     'spec.selected': 'Выбранный автомобиль',
 
     'ch1.num': '01 — Контейнер',
@@ -178,12 +193,19 @@ export const DICT = {
 
     'sale.eyebrow': 'Каталог',
     'sale.title': 'В продаже',
-    'sale.text': 'Автомобили с доставкой из Кореи. Чтобы узнать цену и наличие, нажмите «Узнать подробнее».',
+    'sale.text': 'Наши автомобили в Корее — из объявлений в Instagram. Листайте фото, а чтобы узнать цену и наличие, нажмите «Узнать подробнее».',
     'filter.all': 'Все',
     'filter.suv': 'SUV',
     'filter.sedan': 'Седан',
     'filter.van': 'Минивэн',
     'filter.ev': 'Электро',
+    'filter.sport': 'Спорт',
+
+    'reels.eyebrow': 'Instagram Reels',
+    'reels.title': 'Видеообзоры',
+    'reels.text': 'Наши автомобили на видео. Нажмите на видео — оно откроется в Instagram.',
+    'reels.open': 'Открыть в Instagram',
+    'reels.more': 'Все обзоры — в Instagram',
 
     'sold.eyebrow': 'Портфолио',
     'sold.title': 'Продано',

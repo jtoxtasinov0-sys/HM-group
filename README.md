@@ -15,7 +15,11 @@ Skroll orqali hikoya qiluvchi premium sayt:
    ko'taradi va strela bo'ylab kemadagi bo'sh uyachaga qo'yadi.
 5. **Yetkazish**: kema quyosh tomon suzib ketadi — "40–45 kun".
 
-Undan keyin oddiy bo'limlar keladi: Sotuvda, Sotildi, Mijozlar, Biz haqimizda, Logistika, Kontakt.
+Undan keyin oddiy bo'limlar keladi: Sotuvda, Obzorlar, Sotildi, Mijozlar, Biz haqimizda, Logistika, Kontakt.
+
+- **Sotuvda** — haqiqiy mashinalar (Instagram e'lonlaridan): har birida 4 ta rasm (surib ko'riladi), ma'lumotlar,
+  «Instagram» (postga) va «Ma'lumot olish» tugmalari. Filtr: SUV / Sedan / Sport.
+- **Obzorlar** — Instagram Reels videolari: kartochkada video rasmi ko'rinadi, bosilsa Instagram'da ochiladi.
 Sayt ikki tilli (UZ / RU) va telefonga moslashgan.
 
 ## Ishga tushirish
@@ -56,7 +60,9 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 
 | Nima | Qayerda |
 |---|---|
-| Mashinalar (model, yil, dvigatel, ot kuchi, rang, izoh) | `src/data/cars.js` |
+| Sotuvdagi mashinalar (rasm, yil, dvigatel, ot kuchi, rang, Instagram post) | `src/data/stock.js` → `STOCK` |
+| Obzor videolari (Instagram Reels) | `src/data/stock.js` → `REELS` |
+| 3D garajdagi mashinalar | `src/data/cars.js` |
 | "Sotildi" ro'yxati | `src/data/cars.js` → `SOLD` |
 | Garajdagi mashinalar va ularning tartibi | `src/data/cars.js` → `GARAGE` (joylar: `src/three/garage.js` → `G.slots`) |
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
@@ -66,9 +72,16 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Logotip (HM belgisi) | `src/logo.js` — sayt, 3D sahna va ikonkalar shu shakldan chiziladi |
 | Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |
 
-**Muhim:** `src/data/cars.js` dagi mashinalar va "Sotildi" ro'yxati **namuna**.
-Haqiqiy sotuvdagi mashinalar va haqiqiy sotilganlar bilan almashtiring.
+**Muhim:** `src/data/cars.js` dagi "Sotildi" ro'yxati **namuna** — haqiqiy sotilganlar bilan almashtiring.
 "Mijozlar" bo'limidagi kartochkalar Instagram'ga olib boradi — xohlasangiz haqiqiy videolarni qo'shing.
+
+## Sotuvdagi mashina qo'shish
+
+1. Rasmlarni `HM_Group_mashinalar/<raqam_nomi>/` papkasiga qo'ying (masalan, `11_BMW_X5/`).
+2. `src/data/stock.js` dagi `STOCK` ga mashinani qo'shing (`dir` — papka nomi, `photos` — rasmlar soni, `ig` — Instagram post).
+3. `npm run photos -- <id>` — rasmlar siqilib `public/cars/<id>/1.webp, 2.webp, ...` ga tushadi.
+
+Yangi obzor videosi: `REELS` ga reel ID sini qo'shing (`instagram.com/reel/<ID>/` dagi qism).
 
 ## 3D modellar
 
@@ -105,7 +118,8 @@ src/main.js             — skroll, tillar, katalog, overlaylar
 src/logo.js             — HM logotipi (SVG path)
 src/styles.css          — dizayn
 src/i18n.js             — UZ / RU matnlar
-src/data/cars.js        — mashinalar
+src/data/cars.js        — 3D garaj mashinalari va "Sotildi"
+src/data/stock.js       — sotuvdagi mashinalar (rasmlar bilan) va obzor videolari
 src/three/world.js      — renderer va post-effektlar (bloom, tone mapping), yuklash, hover / tanlash
 src/three/story.js      — skroll hikoyasi (kamera, konteyner, kran, kema)
 src/three/garage.js     — garaj sahnasi
@@ -117,7 +131,8 @@ src/three/sky.js        — osmon (quyosh, bulutlar) va undan muhit xaritasi
 src/three/textures.js   — protsedural teksturalar (bo'yoq, zang, beton, devor, darvoza)
 src/three/materials.js  — mashina bo'yoqlari
 src/three/wheels.js     — g'ildiraklarni ajratish (aylanish, rul, podveska)
-tools/                  — model optimizatsiyasi
+tools/                  — model va rasm optimizatsiyasi
+HM_Group_mashinalar/    — sotuvdagi mashinalarning asl rasmlari (saytga public/cars ichidagi siqilganlari ketadi)
 dev/                    — model ko'ruvchi, g'ildirak tekshiruvi va katalog renderi
 ```
 

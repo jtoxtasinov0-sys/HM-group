@@ -4,7 +4,7 @@
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import {
-  dedup, flatten, join, weld, simplify, prune, textureCompress, meshopt, getBounds, resample,
+  dedup, flatten, join, weld, simplify, simplifyPrimitive, prune, textureCompress, meshopt, getBounds, resample,
 } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
 import draco3d from 'draco3dgltf';
@@ -24,8 +24,8 @@ const MODELS = [
   { id: 'staria',   src: '2022_hyundai_staria_premium.glb',              length: 5.25, rotY: 0,   maxTris: 240000, error: 0.003 },
   { id: 'ev9',      src: '2024_kia_ev9_gt-line.glb',                     length: 5.01, rotY: 0,   maxTris: 240000, error: 0.004, tex: 512, keepTex: /^(disk|Tire|Grill|Plate|GT_Line_Badge|Light)$/ },
   { id: 'urus',     src: '2025_lamborghini_urus_se.glb',                 length: 5.12, rotY: 0,   maxTris: 240000 },
-  { id: 'ghost',    src: 'rolls_royce_ghost__www.vecarz.com.glb',        length: 5.55, rotY: 0,   maxTris: 260000 },
-  { id: 'rrsport',  src: '2023_land_rover_range_rover_sport.glb',        length: 4.95, rotY: 0,   maxTris: 240000 },
+  { id: 'ghost',    src: 'rolls_royce_ghost__www.vecarz.com.glb',        length: 5.55, rotY: 0,   maxTris: 300000, keepMat: /^rrghost_paint/ },
+  { id: 'rrsport',  src: '2023_land_rover_range_rover_sport.glb',        length: 4.95, rotY: 0,   maxTris: 240000, keepMat: /Firenze_Red|RedMain/ },
   { id: 'x6',       src: '2020_bmw_x6_xdrive40i.glb',                    length: 4.94, rotY: 0,   maxTris: 200000 },
   { id: 'escalade', src: '2021_cadillac_escalade_premium.glb',           length: 5.38, rotY: 0,   maxTris: 240000 },
   { id: 'sportage', src: 'kia_sportage.glb',                             length: 4.66, rotY: 0,   maxTris: 220000 },
@@ -102,9 +102,24 @@ for (const cfg of list) {
   await doc.transform(weld());
 
   const tris = countTris(doc);
-  const ratio = Math.min(1, cfg.maxTris / tris);
-  if (ratio < 1) {
-    await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: cfg.error || 0.0012 }));
+  if (cfg.keepMat) {
+    // keepMat: shu materialdagi qismlar (kuzov bo'yog'i) soddalashtirilmaydi — aks holda lakli yuzada
+    // "g'ijimlangan" dog'lar ko'rinadi. Uchburchaklar byudjeti qolgan qismlardan qisqartiriladi.
+    const prims = root.listMeshes().flatMap((m) => m.listPrimitives());
+    const primTris = (p) => (p.getIndices() ? p.getIndices().getCount() : p.getAttribute('POSITION').getCount()) / 3;
+    const kept = prims.filter((p) => cfg.keepMat.test(p.getMaterial()?.getName() || ''));
+    const keptTris = kept.reduce((s, p) => s + primTris(p), 0);
+    const ratio = Math.min(1, Math.max(0.05, (cfg.maxTris - keptTris) / (tris - keptTris)));
+    if (ratio < 1) for (const p of prims) {
+      if (kept.includes(p)) continue;
+      simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio, error: cfg.error || 0.0012 });
+      if (primTris(p) === 0) p.dispose();
+    }
+  } else {
+    const ratio = Math.min(1, cfg.maxTris / tris);
+    if (ratio < 1) {
+      await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: cfg.error || 0.0012 }));
+    }
   }
 
   // Normallashtirish: markazga, yerga (y=0), metr o'lchamiga, uzunlik +Z bo'ylab

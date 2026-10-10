@@ -3,6 +3,8 @@ dist
 *.log
 # asl (og'ir) modellar — saytga public/models ichidagi siqilganlari ketadi
 /*.glb
+# sotuvdagi mashinalarning asl rasmlari (~28 MB) — saytga public/cars ichidagi siqilganlari ketadi (npm run photos)
+/HM_Group_mashinalar/*/*.jpg
 # ma'lumot uchun yuklangan rasmlar (saytda ishlatilmaydi)
 /*.jpg
 /This isn*

@@ -1,5 +1,6 @@
 import Lenis from 'lenis';
 import { CARS, SOLD, GARAGE, GARAGE_START, byId } from './data/cars.js';
+import { STOCK, REELS, reelUrl } from './data/stock.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
 import { seg } from './three/story.js';
@@ -42,34 +43,51 @@ $$('a[href^="#"]').forEach((a) => a.addEventListener('click', (e) => {
 }));
 $$('[data-lang]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.lang)));
 
-// ---------------- Katalog, Sotildi, Mijozlar ----------------
+// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Sotildi, Mijozlar ----------------
 // sayt papkada joylashsa ham ishlashi uchun (masalan, GitHub Pages: /HM-group/)
 const BASE = import.meta.env.BASE_URL;
 const renderSrc = (id) => `${BASE}renders/${id}.webp`;
+const photoSrc = (id, n) => `${BASE}cars/${id}/${n}.webp`;
 const specRow = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
 const lang = () => getLang();
+const IG_ICON = '<svg class="ig-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="0.9"/></svg>';
 
 function cardHTML(car) {
+  const name = `${car.brand} ${car.model}`;
+  const n = car.photos;
+  const specs = [
+    car.year && specRow(t('spec.year'), car.year),
+    car.engine && specRow(t('spec.engine'), car.engine[lang()]),
+    car.hp && specRow(t('spec.power'), `${car.hp} <small>${t('spec.hp')}</small>`),
+    car.km === 0 ? specRow(t('spec.mileage'), t('spec.new')) : car.km && specRow(t('spec.mileage'), `${car.km} km`),
+  ].filter(Boolean);
+  const meta = [car.color?.[lang()], car.note?.[lang()]].filter(Boolean);
   return `
   <article class="card reveal" data-type="${car.type}">
-    <div class="card__media">
-      <span class="card__bg" aria-hidden="true">${car.outline}</span>
-      <span class="card__tag">${car.year}</span>
-      <img src="${renderSrc(car.id)}" alt="${car.brand} ${car.model}" loading="lazy" onerror="this.remove()">
+    <div class="card__media gallery">
+      <div class="gallery__track">
+        ${Array.from({ length: n }, (_, i) => `<img src="${photoSrc(car.id, i + 1)}" alt="${name} — ${i + 1}/${n}" loading="lazy" decoding="async" draggable="false">`).join('')}
+      </div>
+      ${car.year ? `<span class="card__tag">${car.year}</span>` : ''}
+      <span class="gallery__count"><b>1</b> / ${n}</span>
+      <button type="button" class="gallery__btn gallery__btn--prev" data-dir="-1" aria-label="${t('gallery.prev')}" disabled>‹</button>
+      <button type="button" class="gallery__btn gallery__btn--next" data-dir="1" aria-label="${t('gallery.next')}">›</button>
+      <div class="gallery__dots" aria-hidden="true">${'<i></i>'.repeat(n)}</div>
     </div>
     <div class="card__body">
       <div class="card__title">
         <span class="card__brand">${car.brand}</span>
         <h3 class="card__model">${car.model}</h3>
+        ${car.trim ? `<span class="card__trim">${car.trim}</span>` : ''}
       </div>
-      <dl class="card__specs">
-        ${specRow(t('spec.engine'), car.engine[lang()].split('·')[0].trim())}
-        ${specRow(t('spec.power'), `${car.hp} <small>${t('spec.hp')}</small>`)}
-        ${specRow(t('spec.mileage'), `${car.km} km`)}
-      </dl>
+      ${specs.length ? `<dl class="card__specs">${specs.join('')}</dl>` : `<p class="card__ask">${t('spec.ask')}</p>`}
+      ${meta.length ? `<ul class="card__meta">${meta.map((m) => `<li>${m}</li>`).join('')}</ul>` : ''}
       <div class="card__foot">
         <span class="card__price">${t('spec.price')}</span>
-        <a class="btn btn--navy" href="${TG}" target="_blank" rel="noopener">${t('spec.cta')}</a>
+        <div class="card__btns">
+          <a class="btn btn--navy-ghost" href="${car.ig}" target="_blank" rel="noopener">${IG_ICON}Instagram</a>
+          <a class="btn btn--navy" href="${TG}" target="_blank" rel="noopener">${t('spec.cta')}</a>
+        </div>
       </div>
     </div>
   </article>`;
@@ -77,9 +95,62 @@ function cardHTML(car) {
 
 let filter = 'all';
 function renderCatalog() {
-  $('#catalog').innerHTML = CARS.map(cardHTML).join('');
+  $('#catalog').innerHTML = STOCK.map(cardHTML).join('');
+  $$('#catalog .gallery').forEach(syncGallery);
   applyFilter();
   observeReveal($('#catalog'));
+}
+
+// Kartochkadagi rasmlar: barmoq bilan surish (scroll-snap), strelkalar, nuqtalar
+function syncGallery(g) {
+  const track = $('.gallery__track', g);
+  const count = track.children.length;
+  const i = Math.min(count - 1, Math.max(0, Math.round(track.scrollLeft / Math.max(1, track.clientWidth))));
+  if (g._i === i) return;
+  g._i = i;
+  $$('.gallery__dots i', g).forEach((d, k) => d.classList.toggle('is-on', k === i));
+  $('.gallery__count b', g).textContent = String(i + 1);
+  $('.gallery__btn--prev', g).disabled = i === 0;
+  $('.gallery__btn--next', g).disabled = i === count - 1;
+}
+$('#catalog').addEventListener('click', (e) => {
+  const b = e.target.closest('.gallery__btn');
+  if (!b) return;
+  const track = $('.gallery__track', b.parentElement);
+  track.scrollBy({ left: track.clientWidth * Number(b.dataset.dir), behavior: 'smooth' });
+});
+// scroll hodisasi ko'tarilmaydi (bubble) — capture bilan ushlanadi
+$('#catalog').addEventListener('scroll', (e) => {
+  const g = e.target.closest?.('.gallery');
+  if (g) syncGallery(g);
+}, { capture: true, passive: true });
+
+// Obzor videolari: Instagram rasmi (embed) ko'rinadi, ustiga bosilsa — Instagram'da ochiladi.
+// Embed bir marta yaratiladi (til almashganda faqat matn yangilanadi — videolar qayta yuklanmaydi).
+function renderReels() {
+  $('#reels').innerHTML = REELS.map((r, i) => `
+    <article class="reel reveal">
+      <div class="reel__frame" aria-hidden="true">
+        <iframe src="https://www.instagram.com/reel/${r.id}/embed/" loading="lazy" scrolling="no" tabindex="-1" title="Instagram"></iframe>
+      </div>
+      <span class="reel__play" aria-hidden="true"></span>
+      <div class="reel__cap">
+        <span class="reel__n">${String(i + 1).padStart(2, '0')}</span>
+        <strong class="reel__title"></strong>
+        <span class="reel__go">${IG_ICON}<span class="reel__open"></span> ↗</span>
+      </div>
+      <a class="reel__link" href="${reelUrl(r.id)}" target="_blank" rel="noopener"></a>
+    </article>`).join('');
+  updateReels();
+  observeReveal($('#reels'));
+}
+function updateReels() {
+  $$('#reels .reel').forEach((el, i) => {
+    const title = REELS[i].title[lang()];
+    $('.reel__title', el).textContent = title;
+    $('.reel__open', el).textContent = t('reels.open');
+    $('.reel__link', el).setAttribute('aria-label', `${title} — ${t('reels.open')}`);
+  });
 }
 function applyFilter() {
   $$('#catalog .card').forEach((c) => c.classList.toggle('is-hidden', filter !== 'all' && c.dataset.type !== filter));
@@ -148,8 +219,9 @@ $$('[data-count]').forEach((el) => countIO.observe(el));
 
 function renderAll() { renderCatalog(); renderSold(); renderClients(); }
 renderAll();
+renderReels();
 observeReveal();
-onLang(() => { renderAll(); updateShowcase(); updateHint(); });
+onLang(() => { renderAll(); updateReels(); updateShowcase(); updateHint(); });
 
 // ---------------- 3D hikoya qatlamlari ----------------
 const layers = {

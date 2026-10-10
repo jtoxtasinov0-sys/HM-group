@@ -1,11 +1,10 @@
-// HM Group — avtomobillar ro'yxati.
-// DIQQAT: bu NAMUNA ma'lumotlar. Haqiqiy sotuvdagi mashinalar, yil, probeg va
-// komplektatsiyani shu yerda o'zgartiring. Narx ko'rsatilmaydi — "so'rov bo'yicha".
+// HM Group — 3D garaj, «Sotildi» va «Mijozlar» bo'limlari uchun mashinalar (3D model bilan).
+// DIQQAT: bu NAMUNA ma'lumotlar. Saytdagi «Sotuvda» katalogi — src/data/stock.js (haqiqiy mashinalar).
 //
 // paint      — garajdagi 3D model rangi (src/three/materials.js → PAINTS)
 // paintRe    — modeldagi kuzov materiali nomi (regex)
 // file       — ixtiyoriy: 3D model fayli (public/models/<file>.glb), bo'lmasa id; bir model turli rangda ishlatilishi mumkin
-// type       — katalog filtri: suv | sedan | van | ev
+// type       — turi: suv | sedan | van | ev
 // wheels     — ixtiyoriy: { r } g'ildirak radiusi (metr; odatda shinadan avtomatik o'lchanadi) — src/three/wheels.js
 // creaseNormals — ixtiyoriy: kuzov normallarini qayta hisoblash (gradus) — siqishda yuzasi "g'ijimlangan" modellar uchun
 // hideRe     — ixtiyoriy: shu materialdagi qismlar yashiriladi (regex)
@@ -76,7 +75,7 @@ export const CARS = [
     engine: { uz: '6.75 V12 Biturbo', ru: '6.75 V12 Biturbo' },
     color: { uz: 'Tungi safir', ru: 'Ночной сапфир' },
     note: { uz: 'Starlight osmon', ru: 'Звёздное небо Starlight' },
-    paint: 'navy', paintRe: /rrghost_paint$/, paint2: 'silver', paint2Re: /rrghost_paint_b/,
+    paint: 'sapphire', paintRe: /rrghost_paint$/, paint2: 'silver', paint2Re: /rrghost_paint_b/,
   },
   {
     id: 'escalade', brand: 'Cadillac', model: 'Escalade', outline: 'ESCALADE',
