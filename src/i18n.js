@@ -11,9 +11,8 @@ export const DICT = {
 
     'loader.text': 'Garaj tayyorlanmoqda',
 
-    'hero.eyebrow': 'Janubiy Koreya → O\'zbekiston va dunyo',
     'hero.title': 'Koreyadan avtomobil yetkazish —<br><em>100% xavfsiz va rasmiy!</em>',
-    'hero.text': 'To\'liq diagnostika hisoboti va shartnoma asosida.',
+    'hero.text': 'Janubiy Koreyadan O\'zbekistonga va butun dunyoga. To\'liq diagnostika hisoboti va shartnoma asosida.',
     'hero.cta': 'Mashina tanlash',
     'hero.cta2': 'Telegram kanal',
     'hero.hint': 'Mashinaga sichqonchani olib boring — bosib tanlang',
@@ -31,7 +30,6 @@ export const DICT = {
     'spec.new': 'Yangi · 0 km',
     'spec.price': 'Narx — so\'rov bo\'yicha',
     'spec.cta': 'Ma\'lumot olish',
-    'spec.selected': 'Tanlangan avtomobil',
 
     'ch1.num': '01 — Konteyner',
     'ch1.title': 'Har bir mashina — o\'z konteynerida',
@@ -58,7 +56,6 @@ export const DICT = {
     'rail.ship': 'Kema',
     'rail.delivery': 'Yetkazish',
 
-    'sale.eyebrow': 'Katalog',
     'sale.title': 'Sotuvda',
     'sale.text': 'Koreyadan yetkaziladigan avtomobillar. Narx va mavjudlikni bilish uchun «Ma\'lumot olish»ni bosing.',
     'filter.all': 'Barchasi',
@@ -67,18 +64,15 @@ export const DICT = {
     'filter.van': 'Miniven',
     'filter.ev': 'Elektr',
 
-    'sold.eyebrow': 'Portfolio',
     'sold.title': 'Sotildi',
     'sold.text': 'Mijozlarimizga yetkazilgan avtomobillarning bir qismi. To\'liq ro\'yxat — Instagram\'dagi «Sotildi» bo\'limida.',
     'sold.badge': 'Sotildi',
     'sold.more': 'Instagram\'da ko\'rish',
 
-    'clients.eyebrow': 'Mijozlar',
     'clients.title': 'Mijozlarimiz fikri',
     'clients.text': 'Mashinasini qabul qilgan mijozlarimizning video va fikrlari — Instagram\'dagi «Mijozlar» bo\'limida.',
     'clients.more': 'Barcha fikrlar — Instagram\'da',
 
-    'about.eyebrow': 'Biz haqimizda',
     'about.title': 'Koreyadagi avtosalon.<br>Butun dunyo bo\'ylab hamkorlar.',
     'about.text': 'HM Group — Janubiy Koreyada ofis va avtosalonga ega kompaniya. Koreyadan O\'zbekistonga va boshqa davlatlarga avtomobil eksport qilamiz. O\'zbekistonda vakilimiz bor.',
     'about.s1': 'Instagram obunachilar',
@@ -92,7 +86,6 @@ export const DICT = {
     'about.a3t': 'Tadbirkorlar tashrifi',
     'about.a3': '35 ga yaqin o\'zbekistonlik tadbirkorlar Koreyaga tashrif bilan keldi — networking uchrashuvlari.',
 
-    'log.eyebrow': 'Logistika',
     'log.title': 'Koreyadan — eshigingizgacha',
     'log.text': 'To\'rt oddiy qadam. Butun jarayonni o\'zimiz boshqaramiz.',
     'log.1t': 'Tanlash',
@@ -105,7 +98,6 @@ export const DICT = {
     'log.4': '40–45 kunda mashina sizda.',
     'log.days': '40–45 kun',
 
-    'contact.eyebrow': 'Kontakt',
     'contact.title': 'Mashinangizni birga tanlaymiz',
     'contact.text': 'Qo\'ng\'iroq qiling yoki Telegram\'da yozing — tanlov, narx va yetkazish bo\'yicha maslahat beramiz.',
     'contact.kr': 'Koreya',
@@ -129,9 +121,8 @@ export const DICT = {
 
     'loader.text': 'Готовим гараж',
 
-    'hero.eyebrow': 'Южная Корея → Узбекистан и весь мир',
     'hero.title': 'Доставка автомобилей из Кореи —<br><em>100% безопасно и официально!</em>',
-    'hero.text': 'С полным отчётом о диагностике и по договору.',
+    'hero.text': 'Из Южной Кореи — в Узбекистан и весь мир. С полным отчётом о диагностике и по договору.',
     'hero.cta': 'Выбрать авто',
     'hero.cta2': 'Telegram канал',
     'hero.hint': 'Наведите на автомобиль — нажмите, чтобы выбрать',
@@ -149,7 +140,6 @@ export const DICT = {
     'spec.new': 'Новый · 0 км',
     'spec.price': 'Цена — по запросу',
     'spec.cta': 'Узнать подробнее',
-    'spec.selected': 'Выбранный автомобиль',
 
     'ch1.num': '01 — Контейнер',
     'ch1.title': 'Каждый автомобиль — в своём контейнере',
@@ -176,7 +166,6 @@ export const DICT = {
     'rail.ship': 'Судно',
     'rail.delivery': 'Доставка',
 
-    'sale.eyebrow': 'Каталог',
     'sale.title': 'В продаже',
     'sale.text': 'Автомобили с доставкой из Кореи. Чтобы узнать цену и наличие, нажмите «Узнать подробнее».',
     'filter.all': 'Все',
@@ -185,18 +174,15 @@ export const DICT = {
     'filter.van': 'Минивэн',
     'filter.ev': 'Электро',
 
-    'sold.eyebrow': 'Портфолио',
     'sold.title': 'Продано',
     'sold.text': 'Часть автомобилей, доставленных нашим клиентам. Полный список — в разделе «Sotildi» в Instagram.',
     'sold.badge': 'Продано',
     'sold.more': 'Смотреть в Instagram',
 
-    'clients.eyebrow': 'Клиенты',
     'clients.title': 'Отзывы клиентов',
     'clients.text': 'Видео и отзывы клиентов, получивших свои автомобили, — в разделе «Mijozlar» в Instagram.',
     'clients.more': 'Все отзывы — в Instagram',
 
-    'about.eyebrow': 'О нас',
     'about.title': 'Автосалон в Корее.<br>Партнёры по всему миру.',
     'about.text': 'HM Group — компания с офисом и автосалоном в Южной Корее. Экспортируем автомобили из Кореи в Узбекистан и другие страны. В Узбекистане есть наш представитель.',
     'about.s1': 'подписчиков в Instagram',
@@ -210,7 +196,6 @@ export const DICT = {
     'about.a3t': 'Визит предпринимателей',
     'about.a3': 'Около 35 предпринимателей из Узбекистана посетили Корею — нетворкинг-встречи.',
 
-    'log.eyebrow': 'Логистика',
     'log.title': 'Из Кореи — до вашей двери',
     'log.text': 'Четыре простых шага. Весь процесс ведём сами.',
     'log.1t': 'Выбор',
@@ -223,7 +208,6 @@ export const DICT = {
     'log.4': 'Через 40–45 дней автомобиль у вас.',
     'log.days': '40–45 дней',
 
-    'contact.eyebrow': 'Контакты',
     'contact.title': 'Подберём автомобиль вместе',
     'contact.text': 'Позвоните или напишите в Telegram — проконсультируем по выбору, цене и доставке.',
     'contact.kr': 'Корея',
@@ -251,7 +235,10 @@ export function applyI18n(root = document) {
   document.documentElement.lang = lang;
   root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
-  root.querySelectorAll('[data-lang]').forEach((el) => el.classList.toggle('is-active', el.dataset.lang === lang));
+  root.querySelectorAll('[data-lang]').forEach((el) => {
+    el.classList.toggle('is-active', el.dataset.lang === lang);
+    el.setAttribute('aria-pressed', String(el.dataset.lang === lang));
+  });
 }
 
 export function setLang(next) {

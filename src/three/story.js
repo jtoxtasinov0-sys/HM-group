@@ -364,8 +364,7 @@ export function createStory(world) {
       world.outline.material.opacity = show * 0.85;
       world.outline.visible = show > 0.001;
 
-      // sahna logosi va chiroqlar
-      A.stageLogo.material.opacity = 0.55 * (1 - seg(p, 0.03, 0.08));
+      // sahna chiroqlari
       const stageOn = seg(p, 0.05, 0.11) * (1 - seg(p, T.driveA, T.driveA + 0.05));
       A.stageSpot.intensity = 55 * stageOn;
       A.stage.rimMat.color.copy(A.stage.base).multiplyScalar(1 + 2.2 * stageOn);

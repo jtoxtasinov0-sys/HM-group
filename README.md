@@ -62,6 +62,7 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
 | Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`, `IG`) |
 | Ranglar | `src/styles.css` (`:root`) |
+| Animatsiyalar (kirish, paydo bo'lish, logistika yo'li) | `src/styles.css` ("Paydo bo'lish animatsiyalari") va `src/main.js` |
 | Shrift (Inter) | `index.html` (Google Fonts) va `src/styles.css` (`--font`) |
 | Logotip (HM belgisi) | `src/logo.js` — sayt, 3D sahna va ikonkalar shu shakldan chiziladi |
 | Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |

@@ -52,15 +52,6 @@ function drawGroupWord(ctx, cx, y, width, size, color) {
   ctx.restore();
 }
 
-/** Devordagi yorug' logo: HM belgisi + GROUP yozuvi */
-export function makeWallLogoTexture() {
-  const [c, ctx] = canvas(2048, 1024);
-  ctx.clearRect(0, 0, 2048, 1024);
-  drawHM(ctx, 1024, 430, 1000, '#fff');
-  drawGroupWord(ctx, 1024, 800, 1000, 120, '#fff');
-  return tex(c);
-}
-
 /** Mashina orqasidagi katta konturli nom (Taycan uslubida) */
 export function makeOutlineTextTexture(text) {
   const [c, ctx] = canvas(2048, 512);
