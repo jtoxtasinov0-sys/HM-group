@@ -127,6 +127,17 @@ function cloneCar(src) {
   return model;
 }
 
+/**
+ * Brauzer bo'sh turgan paytni kutadi (kadrlar orasida). Og'ir ishlar (model tayyorlash, shader, tekstura)
+ * shu paytlarga bo'lib qo'yiladi — skroll va animatsiya qotmaydi. Qaytaradi: { timeRemaining() }.
+ */
+const idle = (timeout = 300) => new Promise((resolve) => {
+  if (window.requestIdleCallback) requestIdleCallback(resolve, { timeout });
+  else setTimeout(() => { const t = performance.now(); resolve({ timeRemaining: () => Math.max(0, 8 - (performance.now() - t)) }); }, 16);
+});
+
+let meshoptWorkers = false;
+
 export class World {
   constructor(canvas, { cars, start = 0, manifest, quality, onProgress }) {
     this.canvas = canvas;
@@ -153,7 +164,12 @@ export class World {
     // 0 — garaj/hovli, 1 — port; oraliqda ikkala dunyo chiziladi va asta almashadi
     this.blend = 0;
     this.spreaderOn = false;
-    this.perf = { ema: 1 / 60, slowFor: 0, warm: 0, last: 0 };
+    this.perf = { ema: 1 / 60, slowFor: 0, warm: 0, last: 0, step: 0 };
+    this.uploaded = new WeakSet(); // GPU'ga oldindan yuklangan teksturalar
+    this.work = Promise.resolve(); // fondagi og'ir ishlar navbati (bittadan bajariladi)
+    this.mounted = 0;
+    this.shadowSig = NaN;
+    this.outlineDirty = true;
   }
 
   on(type, fn) { this.listeners[type].add(fn); return () => this.listeners[type].delete(fn); }
@@ -161,6 +177,8 @@ export class World {
 
   async init() {
     const { quality } = this;
+    // modellar darhol so'raladi: sahna qurilayotganda (protsessor ishi) tarmoqdan yuklash ham ketaveradi
+    this.startLoading();
     const renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     renderer.setPixelRatio(quality.dpr);
     renderer.setSize(innerWidth, innerHeight, false);
@@ -221,21 +239,85 @@ export class World {
     });
     this.canvas.addEventListener('webglcontextrestored', () => {
       this.contextLost = false;
+      this.uploaded = new WeakSet();
       this.buildEnvMaps();
       this.garage.anim.refreshShadows?.();
       this.applyWorldState(this.blend >= 1 ? 'port' : 'garage');
       document.body.classList.remove('gl-lost');
     });
 
-    // yuklash
-    await this.loadAll();
+    // yuklash: sayt birinchi ko'rinadigan mashina(lar) bilan ochiladi, qolganlari fonda qo'shiladi
+    await this.mountFirst();
 
     this.story = createStory(this);
     this.raycaster = new THREE.Raycaster();
     this.bindEvents();
     this.resize();
     this.selectCar(this.selected, true);
+    // garaj shaderlari sayt ochilishidan oldin tayyorlanadi — birinchi kadrlar qotmaydi
+    await this.precompile('garage');
     renderer.setAnimationLoop(() => this.tick());
+    this.mountRest();
+  }
+
+  /** Fondagi og'ir ishni navbatga qo'yadi: ishlar bir-birining ustiga tushmaydi */
+  later(job) {
+    this.work = this.work.then(job).catch((e) => console.warn(e));
+    return this.work;
+  }
+
+  /**
+   * Shaderlarni oldindan tayyorlaydi. Faqat shu dunyo (va uning chiroqlari) hisobga olinadi — boshqa dunyo
+   * materiallari behuda kompilyatsiya qilinmaydi. Render target o'rnatiladi: unga chizilganda tone mapping va
+   * rang fazosi boshqacha, shader kaliti mos kelmasa, birinchi kadrda baribir qaytadan kompilyatsiya bo'lardi.
+   */
+  precompile(name, object = null) {
+    const { renderer, scene, camera } = this;
+    const inPort = name === 'port';
+    const skip = inPort ? [this.garage.group, this.fleet] : [this.port.group, this.spreader.group];
+    const was = this.blend >= 1 ? 'port' : 'garage';
+    const target = renderer.getRenderTarget();
+    const kids = scene.children;
+    this.setWorld(name);
+    scene.children = kids.filter((o) => !skip.includes(o)); // faqat bir lahzaga (kompilyatsiya sinxron boshlanadi)
+    renderer.setRenderTarget(this.rtScene);
+    let ready;
+    try {
+      ready = object ? renderer.compileAsync(object, camera, scene) : renderer.compileAsync(scene, camera);
+    } finally {
+      scene.children = kids;
+      renderer.setRenderTarget(target);
+      this.setWorld(was);
+    }
+    // kontekst yo'qolsa dastur hech qachon "tayyor" bo'lmaydi — kutish cheklanadi
+    return Promise.race([ready, new Promise((r) => setTimeout(r, 8000))]);
+  }
+
+  /** Teksturalarni GPU'ga birinchi kadrda emas, bo'sh paytlarda oldindan yuklaydi */
+  async uploadTextures(...roots) {
+    const list = new Set();
+    for (const root of roots) root.traverse((o) => {
+      if (!o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        for (const k in m) { const t = m[k]; if (t?.isTexture && !t.isRenderTargetTexture && !this.uploaded.has(t)) list.add(t); }
+      }
+    });
+    let d = null;
+    for (const t of list) {
+      // har bo'sh paytda kamida bitta tekstura, vaqt qolsa — yana
+      if (!d || d.timeRemaining() < 4) d = await idle();
+      if (this.contextLost) return;
+      this.uploaded.add(t);
+      this.renderer.initTexture(t);
+      if (d.didTimeout) d = null;
+    }
+  }
+
+  /** Port dunyosini (kran, kema, okean) oldindan tayyorlash — hikoyaning o'rtasida kadr qotmasin */
+  async warmPort() {
+    await idle();
+    await this.precompile('port');
+    await this.uploadTextures(this.port.group, this.container.group, this.spreader.group);
   }
 
   /** Osmondan PMREM muhit xaritalari (kontekst tiklanganda qayta quriladi) */
@@ -303,26 +385,74 @@ export class World {
     this.scene.environment = s.env;
   }
 
-  async loadAll() {
-    const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  /** Model fayllari navbati: bir vaqtda 2 tadan yuklanadi — tarmoq ko'p faylga bo'linmaydi, kerakli mashina tez keladi */
+  startLoading() {
+    if (!meshoptWorkers) {
+      // geometriyani ochish (meshopt) alohida oqimlarda — asosiy oqim bo'sh qoladi
+      MeshoptDecoder.useWorkers?.(Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) >> 1)));
+      meshoptWorkers = true;
+    }
+    const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+    const fetcher = new THREE.FileLoader().setResponseType('arraybuffer');
     const fileOf = (car) => car.file || car.id;
-    const bytesOf = (f) => this.manifest[f]?.bytes || 3e6;
-    const files = new Map(); // fayl → Promise<gltf> (bir fayl bir marta yuklanadi)
-    const fetchFile = (f, onBytes) => {
-      if (!files.has(f)) {
-        files.set(f, new Promise((resolve, reject) => {
-          loader.load(`${import.meta.env.BASE_URL}models/${f}.glb`, (g) => { onBytes?.(f, bytesOf(f)); resolve(g); },
-            (e) => onBytes?.(f, e.loaded), reject);
-        }));
-      }
-      return files.get(f);
+    const urlOf = (f) => {
+      const v = this.manifest[f]?.v; // fayl o'zgarsa manzil ham o'zgaradi — brauzer keshidan bemalol olinadi
+      return `${import.meta.env.BASE_URL}models/${f}.glb${v ? `?v=${v}` : ''}`;
     };
+    const jobs = new Map(); // fayl → { promise, onBytes }
+    const queue = [];
+    let active = 0;
+    const pump = () => {
+      while (active < 2 && queue.length) {
+        const f = queue.shift();
+        const job = jobs.get(f);
+        active++;
+        fetcher.load(urlOf(f), (buf) => {
+          active--;
+          pump();
+          job.onBytes?.(f, Infinity);
+          gltf.parseAsync(buf, '').then(job.resolve, job.reject);
+        }, (e) => job.onBytes?.(f, e.loaded), (err) => { active--; pump(); job.reject(err); });
+      }
+    };
+
+    // tartib: avval birinchi kadrda ko'rinadiganlar (tanlangan mashina, keyin markazdan chetga), kema oxirida
+    const narrow = this.quality.mobile || innerWidth / innerHeight < 0.95;
+    const rank = (i) => (i === this.selected ? -1 : narrow ? Math.abs(i - this.selected) : Math.abs(G.slots[i].x) + i * 1e-3);
+    const order = this.cars.map((car, i) => i).sort((a, b) => rank(a) - rank(b));
+    const files = [...new Set(order.map((i) => fileOf(this.cars[i])))];
+    for (const f of [...files, 'ship']) {
+      const job = {};
+      job.promise = new Promise((res, rej) => { job.resolve = res; job.reject = rej; });
+      job.promise.catch(() => {});
+      jobs.set(f, job);
+      queue.push(f);
+    }
+    pump();
+
+    this.load = {
+      fileOf, order, jobs,
+      // sayt ochilishi uchun kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
+      need: files.slice(0, narrow ? 1 : 2),
+      get: (f) => jobs.get(f).promise,
+      /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi */
+      prioritize: (f) => {
+        const k = queue.indexOf(f);
+        if (k > 0) { queue.splice(k, 1); queue.unshift(f); }
+      },
+    };
+  }
+
+  /** Joylarni modelsiz quradi va birinchi ko'rinadigan mashinalarni joylaydi (shu bilan sayt ochiladi) */
+  async mountFirst() {
+    const { fileOf, need, jobs } = this.load;
+    const bytesOf = (f) => this.manifest[f]?.bytes || 3e6;
 
     const shadowTex = makeShadowTexture();
     const shadowMat = new THREE.MeshBasicMaterial({ alphaMap: shadowTex, color: '#0b0f16', transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
 
     // Avval har bir joy modelsiz quriladi (o'lchami manifestdan): soya, sichqoncha qutisi, platforma.
-    // Model kelganda ichiga qo'yiladi — garaj markazdagi mashinalar bilan ochiladi, chetdagilari keyin qo'shiladi.
+    // Model kelganda ichiga qo'yiladi — garaj markazdagi mashinalar bilan ochiladi, qolganlari keyin qo'shiladi.
     this.entities = this.cars.map((car, i) => {
       const box = this.manifest[fileOf(car)]?.box || { min: [-1, 0, -2.5], max: [1, 1.6, 2.5] };
       const size = new THREE.Vector3(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]);
@@ -334,6 +464,7 @@ export class World {
       const shadow = new THREE.Mesh(new THREE.PlaneGeometry(size.x + 0.9, size.z + 1.1), shadowMat);
       shadow.rotation.x = -Math.PI / 2;
       shadow.position.y = 0.005;
+      shadow.visible = false; // mashina kelguncha bo'sh platformada qora dog' turmasin
       spin.add(shadow);
       const hit = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ visible: false }));
       hit.position.y = size.y / 2;
@@ -349,7 +480,7 @@ export class World {
       const rig = { front: size.z * 0.3, back: -size.z * 0.3, body: new THREE.Group(), roll() {}, steer() {} };
       return {
         car, model: null, mats: [], root, lift, spin, shadow, hit, size, slot, rig,
-        hover: 0, spinAngle: 0, dim: 1,
+        hover: 0, spinAngle: 0, dim: 1, appear: 1,
         turntable: this.garage.anim.turntables[i],
       };
     });
@@ -358,52 +489,82 @@ export class World {
     // bir model bir necha mashinada (turli rangda) bo'lsa, har biriga asl nusxadan alohida klon
     const uses = new Map();
     for (const e of this.entities) uses.set(fileOf(e.car), (uses.get(fileOf(e.car)) || 0) + 1);
-    const mount = async (e, onBytes, precompile) => {
-      const f = fileOf(e.car);
-      const g = await fetchFile(f, onBytes);
-      const model = uses.get(f) > 1 ? cloneCar(g.scene) : g.scene;
-      const rig = rigWheels(model, e.car.wheels);
-      const { mats } = prepareCarMaterials(model, e.car);
-      model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
-      // sahna ishlab turganda shaderlar oldindan tayyorlanadi — mashina paydo bo'lganda kadr qotmaydi
-      if (precompile) await this.renderer.compileAsync(model, this.camera, this.scene).catch(() => {});
-      e.spin.add(model);
-      Object.assign(e, { model, rig, mats, dim: 1 });
-    };
+    this.load.uses = uses;
 
-    // birinchi navbat — kompyuter ekranida darhol ko'rinadigan markazdagi mashinalar
-    const first = this.entities.filter((e) => Math.abs(e.slot.x) < 14);
-    const firstFiles = [...new Set(first.map((e) => fileOf(e.car)))];
-    const total = firstFiles.reduce((sum, f) => sum + bytesOf(f), 0);
-    const got = Object.fromEntries(firstFiles.map((f) => [f, 0]));
+    // yuklash foizi — faqat sayt ochilishi uchun kerakli fayllar bo'yicha
+    const total = need.reduce((sum, f) => sum + bytesOf(f), 0);
+    const got = Object.fromEntries(need.map((f) => [f, 0]));
     const report = (f, n) => {
-      if (!(f in got)) return;
       got[f] = Math.min(n, bytesOf(f));
       this.onProgress?.(Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
     };
-    await Promise.all(first.map((e) => mount(e, report, false)));
+    for (const f of need) jobs.get(f).onBytes = report;
 
-    // qolganlari va kema — fonda
-    for (const e of this.entities) {
-      if (!first.includes(e)) mount(e, null, true).catch((err) => console.warn('car load failed', e.car.id, err));
+    const first = this.entities.filter((e) => need.includes(fileOf(e.car)));
+    await Promise.all(first.map(async (e) => this.mount(e, await this.load.get(fileOf(e.car)), false)));
+  }
+
+  /** Modelni joyiga qo'yadi. background — sayt ochiq: ish bo'laklarga bo'linadi, mashina silliq paydo bo'ladi */
+  async mount(e, g, background) {
+    if (e.model) return;
+    const f = this.load.fileOf(e.car);
+    const model = this.load.uses.get(f) > 1 ? cloneCar(g.scene) : g.scene;
+    if (background) await idle();
+    const rig = rigWheels(model, e.car.wheels);
+    const { mats } = prepareCarMaterials(model, e.car);
+    model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
+    if (background) {
+      // shader va teksturalar sahna ishlab turganda tayyorlanadi — mashina paydo bo'lganda kadr qotmaydi
+      await idle();
+      await this.precompile('garage', model);
+      await this.uploadTextures(model);
     }
-    this.shipPromise = fetchFile('ship').then((g) => {
+    e.spin.add(model);
+    e.shadow.visible = true;
+    Object.assign(e, { model, rig, mats, dim: 1, appear: background ? 0 : 1 });
+    this.mounted++;
+  }
+
+  /** Qolgan mashinalar va kema — fonda, kelish tartibida, bittadan */
+  mountRest() {
+    const { fileOf, get } = this.load;
+    for (const e of this.entities) {
+      if (e.model) continue;
+      get(fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true)))
+        .catch((err) => console.warn('car load failed', e.car.id, err));
+    }
+    this.later(() => this.warmPort());
+    get('ship').then((g) => this.later(async () => {
+      await idle();
       const ship = g.scene;
       this.port.setShip(ship);
       this.ship = ship;
       this.story?.onShipLoaded?.();
-    }).catch((e) => console.warn('ship load failed', e));
+      await this.warmPort();
+    })).catch((e) => console.warn('ship load failed', e));
   }
 
   selectCar(i, silent = false) {
     if (i < 0 || i >= this.entities.length) return;
-    this.selected = i;
     const car = this.entities[i].car;
-    const tex = makeOutlineTextTexture(car.outline);
+    if (i !== this.selected || !this.outline.material.map) {
+      // katta nom teksturasi darhol emas: sichqoncha mashinalar ustidan o'tganda har biriga chizilmasin
+      this.outlineDirty = true;
+      clearTimeout(this.outlineTimer);
+      this.outlineTimer = setTimeout(() => idle(500).then(() => this.buildOutline()), 350);
+    }
+    this.selected = i;
+    this.load?.prioritize(this.load.fileOf(car));
+    if (!silent) this.emit('select', i, car);
+  }
+
+  buildOutline() {
+    if (!this.outlineDirty) return;
+    this.outlineDirty = false;
+    const tex = makeOutlineTextTexture(this.entities[this.selected].car.outline);
     this.outline.material.map?.dispose();
     this.outline.material.map = tex;
     this.outline.material.needsUpdate = true;
-    if (!silent) this.emit('select', i, car);
   }
 
   bindEvents() {
@@ -433,6 +594,7 @@ export class World {
   setFocus(i) {
     const n = this.entities.length;
     this.focus = ((i % n) + n) % n;
+    this.load?.prioritize(this.load.fileOf(this.entities[this.focus].car));
   }
 
   resize() {
@@ -455,7 +617,7 @@ export class World {
   setActive(v) { this.active = v; }
 
   /**
-   * Kadr juda sekin bo'lsa (kuchsiz GPU) — sifat bir pog'ona pasaytiriladi: avval MSAA, keyin piksel zichligi.
+   * Kadr juda sekin bo'lsa (kuchsiz GPU) — sifat bir pog'ona pasaytiriladi: MSAA, piksel zichligi, pol aksi.
    * Sekin kadrlar GPU'ni "qotirib", brauzer WebGL kontekstini tashlab yuborishiga (oq ekran) olib kelmasin.
    */
   adaptQuality(now) {
@@ -475,9 +637,29 @@ export class World {
       q.msaa = q.msaa > 2 ? 2 : 0;
       this.rtScene.dispose();
       this.rtScene = new THREE.WebGLRenderTarget(this.rtAux.width, this.rtAux.height, { type: THREE.HalfFloatType, samples: q.msaa });
+    } else if (q.dpr > 1.2 && pf.step === 0) {
+      pf.step = 1;
+      q.dpr = Math.max(0.75, q.dpr * 0.82);
+      this.resize();
+    } else if (q.reflections) {
+      // pol aksi sahnani har kadrda yana bir marta chizadi — kuchsiz GPU uchun eng qimmat qism
+      q.reflections = false;
+      this.garage.floor.setReflect(false);
     } else if (q.dpr > 0.8) {
       q.dpr = Math.max(0.75, q.dpr * 0.82);
       this.resize();
+    }
+  }
+
+  /** Garajdagi soya xaritasi faqat biror narsa qimirlaganda qayta chiziladi */
+  updateShadowState() {
+    let sig = this.p * 1e3 + this.mounted * 17 + this.selected * 13;
+    for (const e of this.entities) sig += e.hover * 3 + e.spinAngle * 7 + e.appear * 11;
+    const b = this.entities[this.selected].rig.body.rotation;
+    sig += b.x * 19 + b.z * 23;
+    if (Math.abs(sig - this.shadowSig) > 1e-6) {
+      this.shadowSig = sig;
+      this.garage.anim.spotShadowDirty();
     }
   }
 
@@ -507,7 +689,13 @@ export class World {
     }
 
     this.story.update(this.p, dt, this.time);
-    if (this.blend < 1) this.garage.anim.update(this.time, this.camera);
+    if (this.outlineDirty && this.outline.visible) this.buildOutline();
+    // foydalanuvchi hikoyaga kirdi — kema navbatda oldinga
+    if (!this.shipAsked && this.targetP > 0.12) { this.shipAsked = true; this.load.prioritize('ship'); }
+    if (this.blend < 1) {
+      this.garage.anim.update(this.time, this.camera);
+      this.updateShadowState();
+    }
     if (this.blend > 0) this.port.update(this.time, this.camera, this.story.shadowFocus);
     this.render();
     this.emit('frame', this.p);

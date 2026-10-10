@@ -182,8 +182,11 @@ const railFill = $('#railFill');
 const daysNum = $('#daysNum');
 const DAYS = [40, 45]; // Koreyadan O'zbekistonga yetkazish muddati (kun)
 let lastDays = '';
+let lastP = -1;
 
 function updateLayers(p) {
+  if (p === lastP) return; // skroll to'xtaganda DOM har kadrda qayta yozilmaydi
+  lastP = p;
   setLayer('hero', 1 - seg(p, 0.002, 0.016));
   for (const [k, [a, b, c, d]] of Object.entries(WIN)) setLayer(k, seg(p, a, b) * (1 - seg(p, c, d)));
   railFill.style.transform = `scaleY(${p})`;
@@ -274,8 +277,12 @@ const setLoad = (k) => {
 
 async function boot() {
   try {
-    await document.fonts.load('600 100px Inter').catch(() => {});
-    const manifest = await fetch(`${BASE}models/manifest.json`).then((r) => r.json());
+    // shrift (canvas yozuvlari uchun) va modellar ro'yxati bir vaqtda; shrift sekin kelsa — uzoq kutilmaydi
+    const font = document.fonts.load('600 100px Inter').catch(() => {});
+    const [manifest] = await Promise.all([
+      fetch(`${BASE}models/manifest.json`, { cache: 'no-cache' }).then((r) => r.json()),
+      Promise.race([font, new Promise((r) => setTimeout(r, 2500))]),
+    ]);
     const quality = detectQuality();
     world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest, quality, onProgress: setLoad });
     await world.init();
