@@ -19,8 +19,12 @@ const DEBUG_P = import.meta.env.DEV ? new URLSearchParams(location.search).get('
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 if (!location.hash) scrollTo(0, 0);
 
+// Harakatni kamaytirish so'ralgan bo'lsa (OS sozlamasi): silliq skroll va uchish animatsiyalari o'chadi
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
 // ---------------- Lenis (silliq skroll) ----------------
-const lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 0.85, smoothWheel: true });
+const lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 0.85, smoothWheel: !REDUCE });
 lenis.stop();
 requestAnimationFrame(function raf(time) { lenis.raf(time); requestAnimationFrame(raf); });
 
@@ -31,17 +35,47 @@ const scrollToP = (p, duration = 2.2) => lenis.scrollTo(story.offsetTop + p * st
 
 // ---------------- Navigatsiya ----------------
 const nav = $('#nav');
-$('#burger').addEventListener('click', () => nav.classList.toggle('is-open'));
+const burger = $('#burger');
+function setMenu(open) {
+  nav.classList.toggle('is-open', open);
+  burger.setAttribute('aria-expanded', String(open));
+}
+burger.addEventListener('click', () => setMenu(!nav.classList.contains('is-open')));
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && nav.classList.contains('is-open')) { setMenu(false); burger.focus(); } });
+document.addEventListener('click', (e) => { if (nav.classList.contains('is-open') && !nav.contains(e.target)) setMenu(false); });
 $$('a[href^="#"]').forEach((a) => a.addEventListener('click', (e) => {
   const id = a.getAttribute('href');
   if (id === '#top') { e.preventDefault(); lenis.scrollTo(0, { duration: 2.4 }); return; }
   const el = $(id);
   if (!el) return;
   e.preventDefault();
-  nav.classList.remove('is-open');
-  lenis.scrollTo(el, { offset: -60, duration: 2.4, easing: (x) => 1 - Math.pow(1 - x, 4) });
+  setMenu(false);
+  lenis.scrollTo(el, { offset: -60, duration: REDUCE ? 0.6 : 2.4, easing: (x) => 1 - Math.pow(1 - x, 4) });
 }));
-$$('[data-lang]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.lang)));
+// Til almashinuvi: View Transitions bor brauzerda butun sahifa yumshoq almashadi
+$$('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+  const next = b.dataset.lang;
+  if (next === getLang()) return;
+  if (document.startViewTransition && !REDUCE) document.startViewTransition(() => setLang(next));
+  else setLang(next);
+}));
+
+// Hozir ko'rinib turgan bo'lim menyuda belgilanadi
+const navLinks = $$('#navLinks a');
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((en) => {
+    if (!en.isIntersecting) return;
+    navLinks.forEach((a) => {
+      const on = a.getAttribute('href') === `#${en.target.id}`;
+      a.classList.toggle('is-current', on);
+      if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+    });
+  });
+}, { rootMargin: '-45% 0px -50% 0px' });
+navLinks.forEach((a) => { const el = $(a.getAttribute('href')); if (el) spy.observe(el); });
+new IntersectionObserver(([en]) => {
+  if (en.isIntersecting) navLinks.forEach((a) => { a.classList.remove('is-current'); a.removeAttribute('aria-current'); });
+}, { rootMargin: '-45% 0px -50% 0px' }).observe($('#story'));
 
 // ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Sotildi, Mijozlar ----------------
 // sayt papkada joylashsa ham ishlashi uchun (masalan, GitHub Pages: /HM-group/)
@@ -52,7 +86,10 @@ const specRow = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>
 const lang = () => getLang();
 const IG_ICON = '<svg class="ig-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="0.9"/></svg>';
 
-function cardHTML(car) {
+// Til almashganda qayta chiziladi: bo'lim allaqachon ochilgan bo'lsa, kartochkalar qayta "paydo bo'lmaydi"
+const seen = (root) => (root.querySelector('.reveal.is-in') ? ' is-in' : '');
+
+function cardHTML(car, inCls = '') {
   const name = `${car.brand} ${car.model}`;
   const n = car.photos;
   const specs = [
@@ -63,7 +100,7 @@ function cardHTML(car) {
   ].filter(Boolean);
   const meta = [car.color?.[lang()], car.note?.[lang()]].filter(Boolean);
   return `
-  <article class="card reveal" data-type="${car.type}">
+  <article class="card reveal${inCls}" data-type="${car.type}">
     <div class="card__media gallery">
       <div class="gallery__track">
         ${Array.from({ length: n }, (_, i) => `<img src="${photoSrc(car.id, i + 1)}" alt="${name} — ${i + 1}/${n}" loading="lazy" decoding="async" draggable="false">`).join('')}
@@ -95,7 +132,8 @@ function cardHTML(car) {
 
 let filter = 'all';
 function renderCatalog() {
-  $('#catalog').innerHTML = STOCK.map(cardHTML).join('');
+  const inCls = seen($('#catalog'));
+  $('#catalog').innerHTML = STOCK.map((c) => cardHTML(c, inCls)).join('');
   $$('#catalog .gallery').forEach(syncGallery);
   applyFilter();
   observeReveal($('#catalog'));
@@ -224,32 +262,44 @@ player.addEventListener('close', () => {
 });
 function applyFilter() {
   $$('#catalog .card').forEach((c) => c.classList.toggle('is-hidden', filter !== 'all' && c.dataset.type !== filter));
-  $$('#filters .chip').forEach((b) => b.classList.toggle('is-active', b.dataset.filter === filter));
+  $$('#filters .chip').forEach((b) => {
+    b.classList.toggle('is-active', b.dataset.filter === filter);
+    b.setAttribute('aria-pressed', String(b.dataset.filter === filter));
+  });
 }
 $('#filters').addEventListener('click', (e) => {
   const b = e.target.closest('[data-filter]');
-  if (!b) return;
+  if (!b || b.dataset.filter === filter) return;
   filter = b.dataset.filter;
   applyFilter();
-  $$('#catalog .card:not(.is-hidden)').forEach((c) => c.classList.add('is-in'));
+  // filtrdan keyin qolgan mashinalar navbat bilan joyiga tushadi
+  $$('#catalog .card:not(.is-hidden)').forEach((c, i) => {
+    c.classList.add('is-in');
+    if (REDUCE) return;
+    c.animate([{ opacity: 0, transform: 'translateY(18px) scale(.985)' }, { opacity: 1, transform: 'none' }],
+      { duration: 520, delay: Math.min(i, 6) * 55, easing: EASE_OUT, fill: 'backwards' });
+  });
 });
 
 function renderSold() {
+  const inCls = seen($('#sold'));
   $('#sold').innerHTML = SOLD.map((id) => {
     const c = byId(id);
-    return `<div class="sold-card">
+    return `<div class="sold-card reveal${inCls}">
       <div class="sold-card__media"><img src="${renderSrc(id)}" alt="${c.brand} ${c.model}" loading="lazy" onerror="this.remove()"><span class="sold-card__stamp">${t('sold.badge')}</span></div>
       <div class="sold-card__body"><strong>${c.brand} ${c.model}</strong><span>${c.year}</span></div>
     </div>`;
   }).join('');
+  observeReveal($('#sold'));
 }
 
 function renderClients() {
   const ids = ['staria', 'g63', 'ev9', 'escalade'];
+  const inCls = seen($('#clients'));
   $('#clients').innerHTML = ids.map((id) => {
     const c = byId(id);
-    return `<a class="clip reveal" href="${IG}" target="_blank" rel="noopener">
-      <span class="clip__play" aria-hidden="true"></span>
+    return `<a class="clip reveal${inCls}" href="${IG}" target="_blank" rel="noopener">
+      <span class="clip__play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></span>
       <img src="${renderSrc(id)}" alt="" loading="lazy" onerror="this.remove()">
       <strong>${c.brand} ${c.model}</strong>
       <span>${lang() === 'ru' ? 'Видео клиента' : 'Mijoz videosi'} · Instagram</span>
@@ -259,11 +309,16 @@ function renderClients() {
 }
 
 // ---------------- Reveal + raqamlar ----------------
+// Bir vaqtda ekranga kirgan elementlar navbat bilan ochiladi (kechikish 5 qadam bilan cheklangan).
+// Animatsiya tugagach kechikish olib tashlanadi — hover darhol javob beradi.
 const io = new IntersectionObserver((entries) => {
-  entries.forEach((en) => {
-    if (!en.isIntersecting) return;
-    en.target.classList.add('is-in');
-    io.unobserve(en.target);
+  entries.filter((en) => en.isIntersecting).forEach((en, i) => {
+    const el = en.target;
+    const k = Math.min(i, 5);
+    if (k) el.style.setProperty('--i', k);
+    el.classList.add('is-in');
+    io.unobserve(el);
+    if (k) setTimeout(() => el.style.removeProperty('--i'), 1300 + k * 70);
   });
 }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
 function observeReveal(root = document) { $$('.reveal:not(.is-in)', root).forEach((el) => io.observe(el)); }
@@ -277,6 +332,7 @@ const countIO = new IntersectionObserver((entries) => {
     const dec = String(el.dataset.count).includes('.') ? 1 : 0;
     const start = performance.now();
     const fmt = (v) => `${el.dataset.prefix || ''}${v.toFixed(dec).replace('.', ',')}${el.dataset.suffix || ''}`;
+    if (REDUCE) { el.textContent = fmt(to); return; }
     const step = (now) => {
       const k = Math.min(1, (now - start) / 1600);
       el.textContent = fmt(to * (1 - Math.pow(1 - k, 3)));
@@ -286,6 +342,34 @@ const countIO = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.6 });
 $$('[data-count]').forEach((el) => countIO.observe(el));
+
+// ---------------- Logistika: yo'l chizig'i skroll bilan to'ladi ----------------
+// Bir qatordagi qadamlar chapdan o'ngga navbat bilan to'ladi; telefonda (bitta ustun) — har biri o'z joyida.
+const steps = $$('#steps .step');
+const routeLine = $('#routebar .routebar__line');
+let logActive = false;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+function updateLogistics() {
+  if (!logActive) return;
+  const vh = innerHeight;
+  const rows = new Map();
+  for (const st of steps) {
+    const top = Math.round(st.getBoundingClientRect().top);
+    if (!rows.has(top)) rows.set(top, []);
+    rows.get(top).push(st);
+  }
+  for (const [top, row] of rows) {
+    const p = clamp01((vh * 0.88 - top) / (vh * 0.4));
+    row.forEach((st, j) => {
+      const k = clamp01(p * row.length - j);
+      st.style.setProperty('--k', k.toFixed(3));
+      st.classList.toggle('is-on', k > 0.35);
+    });
+  }
+  const rt = routeLine.closest('.routebar').getBoundingClientRect().top;
+  routeLine.style.setProperty('--p', clamp01((vh * 0.95 - rt) / (vh * 0.45)).toFixed(3));
+}
+new IntersectionObserver(([en]) => { logActive = en.isIntersecting; updateLogistics(); }, { rootMargin: '10% 0px' }).observe($('#logistika'));
 
 function renderAll() { renderCatalog(); renderSold(); renderClients(); }
 renderAll();
@@ -343,6 +427,13 @@ function updateLayers(p) {
 // ---------------- Tanlangan mashina ma'lumotlari ----------------
 let world = null;
 let selected = GARAGE[GARAGE_START];
+let shownIdx = -1;
+
+// Mashina almashganda raqam va nom yo'nalish bo'yicha "aylanadi"
+function roll(el, dir) {
+  if (REDUCE || !el.animate) return;
+  el.animate([{ opacity: 0, transform: `translateY(${dir * 40}%)` }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EASE_OUT });
+}
 
 function updateShowcase() {
   const c = selected;
@@ -358,6 +449,13 @@ function updateShowcase() {
   const idx = GARAGE.indexOf(c);
   $('#counterNum').textContent = String(idx + 1).padStart(2, '0');
   $('#counterName').textContent = `${c.brand} ${c.model}`;
+  if (shownIdx >= 0 && idx !== shownIdx) {
+    const dir = idx > shownIdx ? 1 : -1;
+    roll($('#counterNum'), dir);
+    roll($('#counterName'), dir);
+    roll($('#scModel'), dir);
+  }
+  shownIdx = idx;
 }
 $('.counter__total').textContent = `/ ${String(GARAGE.length).padStart(2, '0')}`;
 updateShowcase();
@@ -401,8 +499,56 @@ lenis.on('scroll', ({ scroll }) => {
   const p = progressAt(scroll);
   if (world && DEBUG_P === null) world.targetP = p;
   updateNav(scroll);
+  updateLogistics();
 });
-addEventListener('resize', () => { if (world && DEBUG_P === null) world.targetP = progressAt(lenis.scroll); });
+addEventListener('resize', () => {
+  if (world && DEBUG_P === null) world.targetP = progressAt(lenis.scroll);
+  updateLogistics();
+});
+
+// ---------------- Kirish animatsiyasi ----------------
+// Sarlavha so'zlarga ajratiladi: har bir so'z o'z niqobi ichidan ko'tariladi.
+// Til almashganda matn qayta yoziladi va oddiy (ajratilmagan) holda qoladi.
+function splitWords(root) {
+  let n = 0;
+  const walk = (node) => {
+    [...node.childNodes].forEach((ch) => {
+      if (ch.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        ch.textContent.split(/(\s+)/).forEach((part) => {
+          if (!part) return;
+          if (/^\s+$/.test(part)) { frag.append(part); return; }
+          const w = document.createElement('span');
+          w.className = 'w';
+          const inner = document.createElement('span');
+          inner.textContent = part;
+          inner.style.setProperty('--d', 120 + n++ * 55);
+          w.append(inner);
+          frag.append(w);
+        });
+        ch.replaceWith(frag);
+      } else if (ch.nodeType === 1 && ch.tagName !== 'BR') walk(ch);
+    });
+  };
+  walk(root);
+}
+if (!REDUCE) splitWords($('.hero__title'));
+
+// Yuklovchidagi HM belgisi sarlavhadagi logotip joyiga uchib boradi (bir xil shakl — uzluksiz o'tish)
+function handoffLogo(done) {
+  const from = $('.loader__logo');
+  const to = $('#navLogo');
+  const a = from.getBoundingClientRect();
+  const b = to.getBoundingClientRect();
+  if (REDUCE || !from.animate || !a.width || !b.width) { done(); return; }
+  const s = b.width / a.width;
+  const anim = from.animate([
+    { transform: 'none', fill: '#ffffff' },
+    { transform: `translate(${b.left - a.left}px, ${b.top - a.top}px) scale(${s})`, fill: getComputedStyle(to).color },
+  ], { duration: 950, easing: EASE_OUT, fill: 'forwards' });
+  anim.onfinish = done;
+  anim.oncancel = done;
+}
 
 // ---------------- 3D ishga tushirish ----------------
 const loader = $('#loader');
@@ -462,8 +608,11 @@ async function boot() {
   setLoad(1);
   setTimeout(() => {
     loader.classList.add('is-done');
-    document.body.classList.remove('is-loading');
-    lenis.start();
+    document.body.classList.add('is-ready');
+    handoffLogo(() => {
+      document.body.classList.remove('is-loading');
+      lenis.start();
+    });
   }, 450);
 }
 boot();
