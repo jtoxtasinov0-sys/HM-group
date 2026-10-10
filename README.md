@@ -4,6 +4,9 @@
 
 Skroll orqali hikoya qiluvchi premium sayt:
 
+0. **Kirish**: yuklovchi — garaj darvozasi: tayyor bo'lgach tepaga ko'tariladi, ortidan qorong'i garaj ochiladi,
+   chiroqlar asta yonadi va kamera yuqoridan / uzoqdan garajga kirib keladi; HM belgisi header'ga uchib boradi,
+   sarlavha so'zlari niqobdan ko'tariladi, urg'u qatori bo'ylab yorug'lik o'tadi.
 1. **Garaj**: oq dumaloq showroom (shiftda katta yorug' doira), 11 ta mashina bir qatorda oq platformalarda
    (qora rezina halqa bilan) turadi. Sichqoncha mashina ustiga borsa, mashina kattalashadi va tomoshabinga qarab
    buriladi. Bosilsa, o'sha mashina tanlanadi. Telefonda ‹ › tugmalari bilan mashinalar almashtiriladi.
@@ -15,13 +18,20 @@ Skroll orqali hikoya qiluvchi premium sayt:
    ko'taradi va strela bo'ylab kemadagi bo'sh uyachaga qo'yadi.
 5. **Yetkazish**: kema quyosh tomon suzib ketadi — "40–45 kun".
 
-Undan keyin oddiy bo'limlar keladi: Sotuvda, Obzorlar, Sotildi, Mijozlar, Biz haqimizda, Logistika, Kontakt.
+Hikoya oxirida brendlar lentasi (Mercedes-Benz, Porsche, BMW...) 3D sahna ustiga "parda" bo'lib ko'tariladi,
+sahna esa kichrayib orqaga ketadi. Undan keyin oddiy bo'limlar: Sotuvda, Obzorlar, Mijozlar, Biz haqimizda,
+Logistika, Kontakt.
 
 - **Sotuvda** — haqiqiy mashinalar (Instagram e'lonlaridan): har birida 4 ta rasm (surib ko'riladi), ma'lumotlar,
   «Instagram» (postga) va «Ma'lumot olish» tugmalari. Filtr: SUV / Sedan / Sport.
 - **Obzorlar** — Instagram Reels videolari saytning o'zida: kartochkalarda hamma videolar ovozsiz o'ynab turadi (12 soniyalik parcha),
   bosilsa katta oynada to'liq video ovozi bilan ochiladi (‹ › — keyingi video, oynada «Instagram'da ochish» ham bor).
 Sayt ikki tilli (UZ / RU) va telefonga moslashgan.
+
+Harakatlar (`src/motion.js`): sahifa progress chizig'i, skroll tezligi bilan tezlashadigan brendlar lentasi,
+"Biz haqimizda" sarlavhasi skroll bilan so'zma-so'z yonadi, kompyuterda kartochkalar sichqonchaga qarab egiladi,
+footer'dagi katta HM GROUP belgisi pastdan ko'tariladi. Hammasi faqat transform / opacity bilan; tizimda
+"harakatni kamaytirish" yoqilgan bo'lsa — o'chadi.
 
 ## Ishga tushirish
 
@@ -64,17 +74,17 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Sotuvdagi mashinalar (rasm, yil, dvigatel, ot kuchi, rang, Instagram post) | `src/data/stock.js` → `STOCK` |
 | Obzor videolari (Instagram Reels) | `src/data/stock.js` → `REELS`, fayllar `public/reels/` (`npm run reels`) |
 | 3D garajdagi mashinalar | `src/data/cars.js` |
-| "Sotildi" ro'yxati | `src/data/cars.js` → `SOLD` |
 | Garajdagi mashinalar va ularning tartibi | `src/data/cars.js` → `GARAGE` (joylar: `src/three/garage.js` → `G.slots`) |
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
 | Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`, `IG`) |
 | Ranglar | `src/styles.css` (`:root`) |
 | Animatsiyalar (kirish, paydo bo'lish, logistika yo'li) | `src/styles.css` ("Paydo bo'lish animatsiyalari") va `src/main.js` |
+| Brendlar lentasi, parda, egilish, footer belgisi | `index.html` (`.curtain`), `src/motion.js`, `src/styles.css` ("Harakatlar") |
 | Shrift (Inter) | `index.html` (Google Fonts) va `src/styles.css` (`--font`) |
 | Logotip (HM belgisi) | `src/logo.js` — sayt, 3D sahna va ikonkalar shu shakldan chiziladi |
 | Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |
 
-**Muhim:** `src/data/cars.js` dagi "Sotildi" ro'yxati **namuna** — haqiqiy sotilganlar bilan almashtiring.
+**Muhim:** `src/data/cars.js` dagi 3D garaj mashinalarining ma'lumotlari **namuna** (haqiqiy katalog — `stock.js`).
 "Mijozlar" bo'limidagi kartochkalar Instagram'ga olib boradi — xohlasangiz haqiqiy videolarni qo'shing.
 
 ## Sotuvdagi mashina qo'shish
@@ -98,7 +108,9 @@ Asl `.glb` fayllar juda og'ir edi (jami ~1 GB). Ular siqildi va `public/models/`
 geometriya soddalashtirildi, meshopt bilan siqildi, teksturalar WebP ga o'tkazildi
 (masalan, Maybach: 81 MB → 3.4 MB).
 
-Garajdagi barcha mashinalar va kema saytda yuklanadi (~42 MB). Sayt tez ochilishi uchun faqat birinchi
+Kompyuterda garajdagi barcha mashinalar va kema yuklanadi (~38 MB). Telefonda (portret) kadrda bir vaqtda 2–3 ta
+mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~15 MB),
+qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Sayt tez ochilishi uchun faqat birinchi
 kadrda kerakli modellar kutiladi: kompyuterda markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB), telefonda —
 tanlangan mashina (G 63, ~3.4 MB). Qolganlari markazdan chetga tartibda, bir vaqtda 2 tadan fonda
 yuklanadi va platformada silliq paydo bo'ladi; kema oxirida (foydalanuvchi skrollni boshlasa — oldinroq).
@@ -112,6 +124,11 @@ Tezlik uchun (qotmasligi uchun):
 - meshopt geometriyasi alohida oqimlarda (Web Worker) ochiladi;
 - garajdagi soya xaritasi faqat biror narsa qimirlaganda qayta chiziladi;
 - kuchsiz GPU'da sifat avtomatik pasayadi (MSAA → piksel zichligi → pol aksi);
+- 3D kadr o'lchami canvas'ning o'zidan olinadi (`100lvh`): telefonda manzil paneli yashirilib/chiqqanda
+  render target'lar qayta yaratilmaydi va rasm cho'zilmaydi;
+- telefonda hech narsa qimirlamayotganda sahna 30 kadr/s chiziladi (telefon qizib, sekinlashib qolmaydi);
+  port shaderlari skroll to'xtagan paytda tayyorlanadi;
+- telefonda videolar va panellar ustidagi `backdrop-filter` (xiralashtirish) o'rniga zich fon;
 - `manifest.json` dagi `v` — model fayli xeshi: model `?v=...` bilan so'raladi va brauzer keshida
   uzoq saqlanadi (`vercel.json` → `headers`). Model o'zgarsa `npm run models` xeshni o'zi yangilaydi.
 
@@ -136,11 +153,12 @@ Kuzov rangi: `paint` (`pearl`, `navy`, `obsidian`, `silver`, `ice`, `graphite` �
 
 ```
 index.html              — sahifa
-src/main.js             — skroll, tillar, katalog, overlaylar
+src/main.js             — skroll, tillar, katalog, overlaylar, kirish animatsiyasi
+src/motion.js           — sahifa harakatlari (progress, brendlar lentasi, parda, egilish, footer belgisi)
 src/logo.js             — HM logotipi (SVG path)
 src/styles.css          — dizayn
 src/i18n.js             — UZ / RU matnlar
-src/data/cars.js        — 3D garaj mashinalari va "Sotildi"
+src/data/cars.js        — 3D garaj mashinalari
 src/data/stock.js       — sotuvdagi mashinalar (rasmlar bilan) va obzor videolari (public/reels)
 src/three/world.js      — renderer va post-effektlar (bloom, tone mapping), yuklash, hover / tanlash
 src/three/story.js      — skroll hikoyasi (kamera, konteyner, kran, kema)

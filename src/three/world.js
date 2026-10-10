@@ -99,6 +99,7 @@ const HIGHPASS_FRAG = /* glsl */`
   }`;
 
 const PIXEL_BUDGET = 3.6e6; // ~2560x1400: undan katta kadr GPU xotirasini to'ldirib, kontekstni yo'qotishi mumkin
+const NEAR = 2; // telefonda: tanlangan mashinaning har ikki tomonidan nechtasi oldindan yuklanadi
 
 export function detectQuality() {
   const coarse = matchMedia('(pointer: coarse)').matches;
@@ -170,6 +171,11 @@ export class World {
     this.mounted = 0;
     this.shadowSig = NaN;
     this.outlineDirty = true;
+    this.lastInput = 0;    // oxirgi skroll / mashina almashtirish vaqti (performance.now)
+    this.view = null;      // canvas o'lchami (CSS piksel) va DPR — o'zgarmasa resize hech narsa qilmaydi
+    // kirish animatsiyasi (1 → 0): kamera uzoqdan va yuqoridan kirib keladi, garaj chiroqlari yonadi (main.js)
+    this.intro = 0;
+    this.frame = 0;
   }
 
   on(type, fn) { this.listeners[type].add(fn); return () => this.listeners[type].delete(fn); }
@@ -385,7 +391,11 @@ export class World {
     this.scene.environment = s.env;
   }
 
-  /** Model fayllari navbati: bir vaqtda 2 tadan yuklanadi — tarmoq ko'p faylga bo'linmaydi, kerakli mashina tez keladi */
+  /**
+   * Model fayllari navbati: bir vaqtda 2 tadan yuklanadi — tarmoq ko'p faylga bo'linmaydi, kerakli mashina tez keladi.
+   * Telefonda (portret) kadrda bir vaqtda 2–3 ta mashina ko'rinadi: faqat tanlanganning yonidagilar (±NEAR) yuklanadi,
+   * qolganlari foydalanuvchi ularga o'tganda. Avval hammasi (~40 MB) yuklanardi — telefon xotirasi to'lib, sayt qotardi.
+   */
   startLoading() {
     if (!meshoptWorkers) {
       // geometriyani ochish (meshopt) alohida oqimlarda — asosiy oqim bo'sh qoladi
@@ -402,6 +412,17 @@ export class World {
     const jobs = new Map(); // fayl → { promise, onBytes }
     const queue = [];
     let active = 0;
+    const enqueue = (f) => {
+      if (!jobs.has(f)) {
+        const job = {};
+        job.promise = new Promise((res, rej) => { job.resolve = res; job.reject = rej; });
+        job.promise.catch(() => {});
+        jobs.set(f, job);
+        queue.push(f);
+        pump();
+      }
+      return jobs.get(f);
+    };
     const pump = () => {
       while (active < 2 && queue.length) {
         const f = queue.shift();
@@ -421,22 +442,19 @@ export class World {
     const rank = (i) => (i === this.selected ? -1 : narrow ? Math.abs(i - this.selected) : Math.abs(G.slots[i].x) + i * 1e-3);
     const order = this.cars.map((car, i) => i).sort((a, b) => rank(a) - rank(b));
     const files = [...new Set(order.map((i) => fileOf(this.cars[i])))];
-    for (const f of [...files, 'ship']) {
-      const job = {};
-      job.promise = new Promise((res, rej) => { job.resolve = res; job.reject = rej; });
-      job.promise.catch(() => {});
-      jobs.set(f, job);
-      queue.push(f);
-    }
-    pump();
+    this.lazy = this.quality.mobile && narrow;
+    const near = this.lazy ? order.filter((i) => Math.abs(i - this.selected) <= NEAR) : order;
+    for (const f of new Set(near.map((i) => fileOf(this.cars[i])))) enqueue(f);
+    if (!this.lazy) enqueue('ship'); // telefonda kema hikoyaga kirilganda so'raladi (tick → prioritize)
 
     this.load = {
       fileOf, order, jobs,
       // sayt ochilishi uchun kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
       need: files.slice(0, narrow ? 1 : 2),
-      get: (f) => jobs.get(f).promise,
-      /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi */
+      get: (f) => enqueue(f).promise,
+      /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi (navbatda bo'lmasa — qo'shiladi) */
       prioritize: (f) => {
+        enqueue(f);
         const k = queue.indexOf(f);
         if (k > 0) { queue.splice(k, 1); queue.unshift(f); }
       },
@@ -525,24 +543,55 @@ export class World {
     this.mounted++;
   }
 
+  /** Mashinani fonda yuklab joyiga qo'yadi (bir marta) */
+  mountLater(e) {
+    if (e.model || e.pending) return;
+    e.pending = true;
+    this.load.get(this.load.fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true)))
+      .catch((err) => { e.pending = false; console.warn('car load failed', e.car.id, err); });
+  }
+
+  /** Telefonda: ko'rilayotgan mashina va uning yonidagilar (qolganlari kerak bo'lganda) */
+  mountNear(i) {
+    if (!this.entities) return;
+    if (!this.lazy) { this.entities.forEach((e) => this.mountLater(e)); return; }
+    this.entities.forEach((e, k) => { if (Math.abs(k - i) <= NEAR) this.mountLater(e); });
+  }
+
   /** Qolgan mashinalar va kema — fonda, kelish tartibida, bittadan */
   mountRest() {
-    const { fileOf, get } = this.load;
-    for (const e of this.entities) {
-      if (e.model) continue;
-      get(fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true)))
-        .catch((err) => console.warn('car load failed', e.car.id, err));
+    this.mountNear(this.selected);
+    if (this.lazy) {
+      // telefonda kema yaqin mashinalardan keyin yoki hikoyaga kirilganda (tick) so'raladi
+      setTimeout(() => this.loadShip(), 4000);
+      return;
     }
     // port shaderlari — sayt ochilish animatsiyasi tugagach (u silliq o'tsin)
     setTimeout(() => this.later(() => this.warmPort()), 1500);
-    get('ship').then((g) => this.later(async () => {
-      await idle();
-      const ship = g.scene;
-      this.port.setShip(ship);
-      this.ship = ship;
-      this.story?.onShipLoaded?.();
-      await this.warmPort();
-    })).catch((e) => console.warn('ship load failed', e));
+    this.loadShip();
+  }
+
+  loadShip() {
+    if (this.shipLoading) return;
+    this.shipLoading = true;
+    this.load.get('ship').then(async (g) => {
+      // telefonda kema va port shaderlari skroll to'xtagan paytda tayyorlanadi — kadr qotishi sezilmasin
+      await this.calm();
+      return this.later(async () => {
+        await idle();
+        const ship = g.scene;
+        this.port.setShip(ship);
+        this.ship = ship;
+        this.story?.onShipLoaded?.();
+        await this.warmPort();
+      });
+    }).catch((e) => console.warn('ship load failed', e));
+  }
+
+  /** Telefonda: foydalanuvchi skroll qilmay turgan paytni kutadi (port kerak bo'lib qolsa — kutmaydi) */
+  async calm(ms = 700) {
+    if (!this.lazy) return;
+    while (performance.now() - this.lastInput < ms && this.targetP < 0.4) await new Promise((r) => setTimeout(r, 200));
   }
 
   selectCar(i, silent = false) {
@@ -556,6 +605,7 @@ export class World {
     }
     this.selected = i;
     this.load?.prioritize(this.load.fileOf(car));
+    this.mountNear(i);
     if (!silent) this.emit('select', i, car);
   }
 
@@ -595,12 +645,21 @@ export class World {
   setFocus(i) {
     const n = this.entities.length;
     this.focus = ((i % n) + n) % n;
+    this.lastInput = performance.now();
     this.load?.prioritize(this.load.fileOf(this.entities[this.focus].car));
+    this.mountNear(this.focus);
   }
 
+  /**
+   * O'lcham canvas'ning o'zidan olinadi (u 100lvh — styles.css). Telefonda manzil paneli yashirilib/chiqqanda
+   * innerHeight o'zgaradi, lekin canvas o'zgarmaydi: render target'lar qayta yaratilmaydi (avval har safar
+   * qayta yaratilib, skroll paytida kadr qotardi) va rasm cho'zilmaydi.
+   */
   resize() {
-    const w = innerWidth, h = innerHeight;
+    const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
     const dpr = this.quality.dpr;
+    if (this.view && this.view.w === w && this.view.h === h && this.view.dpr === dpr) return;
+    this.view = { w, h, dpr };
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.projDirty = true;
@@ -613,6 +672,8 @@ export class World {
     this.bloom.materialHighPassFilter.uniforms.uTexel.value.set(2 / pw, 2 / ph);
     this.garage.floor.setSize(w, h);
     this.portrait = w / h < 0.95;
+    // telefon yotqizildi: kadrda butun garaj ko'rinadi — qolgan mashinalar ham yuklanadi
+    if (this.lazy && !this.portrait && this.entities) { this.lazy = false; this.mountNear(this.selected); }
   }
 
   setActive(v) { this.active = v; }
@@ -692,13 +753,18 @@ export class World {
     this.story.update(this.p, dt, this.time);
     if (this.outlineDirty && this.outline.visible) this.buildOutline();
     // foydalanuvchi hikoyaga kirdi — kema navbatda oldinga
-    if (!this.shipAsked && this.targetP > 0.12) { this.shipAsked = true; this.load.prioritize('ship'); }
+    if (!this.shipAsked && this.targetP > 0.12) { this.shipAsked = true; this.loadShip(); this.load.prioritize('ship'); }
     if (this.blend < 1) {
       this.garage.anim.update(this.time, this.camera);
       this.updateShadowState();
     }
     if (this.blend > 0) this.port.update(this.time, this.camera, this.story.shadowFocus);
-    this.render();
+    // Telefonda hech narsa qimirlamayotganda (skroll yo'q, mashina almashmayapti) sahna 30 kadr/s chiziladi:
+    // GPU yarim yuklanadi — telefon qizib, sekinlashib qolmaydi, sahifaning qolgan qismi silliq ishlaydi
+    const now = performance.now();
+    if (this.targetP !== this.lastTarget) { this.lastTarget = this.targetP; this.lastInput = now; }
+    const still = this.quality.mobile && this.intro <= 0 && now - this.lastInput > 1200 && this.p === this.targetP;
+    if (!still || (++this.frame & 1)) this.render();
     this.emit('frame', this.p);
   }
 
@@ -729,7 +795,10 @@ export class World {
     }
     if (this.bloom.enabled) this.bloom.render(renderer, null, rtScene, 0, false);
     this.final.uniforms.tDiffuse.value = rtScene.texture;
-    this.final.uniforms.toneMappingExposure.value = renderer.toneMappingExposure;
+    // kirishda garaj chiroqlari asta yonadi: avval qorong'i zal, keyin to'liq yorug'lik
+    const lights = this.intro > 0 ? 0.18 + 0.82 * THREE.MathUtils.smoothstep(1 - this.intro, 0.04, 0.62) : 1;
+    this.final.uniforms.toneMappingExposure.value = renderer.toneMappingExposure * lights;
+    this.final.uniforms.uVignette.value = 0.55 + 0.4 * (1 - lights);
     renderer.setRenderTarget(null);
     this.finalQuad.render(renderer);
   }
@@ -737,7 +806,8 @@ export class World {
   /** 3D nuqtani ekran koordinatasiga */
   project(v) {
     const p = v.clone().project(this.camera);
-    return { x: (p.x * 0.5 + 0.5) * innerWidth, y: (-p.y * 0.5 + 0.5) * innerHeight, visible: p.z < 1 };
+    const { w, h } = this.view;
+    return { x: (p.x * 0.5 + 0.5) * w, y: (-p.y * 0.5 + 0.5) * h, visible: p.z < 1 };
   }
 
   setDim(e, k) {

@@ -3,7 +3,6 @@ export const DICT = {
   uz: {
     'nav.sale': 'Sotuvda',
     'nav.reviews': 'Obzorlar',
-    'nav.sold': 'Sotildi',
     'nav.clients': 'Mijozlar',
     'nav.about': 'Biz haqimizda',
     'nav.logistics': 'Logistika',
@@ -80,11 +79,6 @@ export const DICT = {
     'reels.next': 'Keyingi video',
     'reels.more': 'Barcha obzorlar — Instagram\'da',
 
-    'sold.title': 'Sotildi',
-    'sold.text': 'Mijozlarimizga yetkazilgan avtomobillarning bir qismi. To\'liq ro\'yxat — Instagram\'dagi «Sotildi» bo\'limida.',
-    'sold.badge': 'Sotildi',
-    'sold.more': 'Instagram\'da ko\'rish',
-
     'clients.title': 'Mijozlarimiz fikri',
     'clients.text': 'Mashinasini qabul qilgan mijozlarimizning video va fikrlari — Instagram\'dagi «Mijozlar» bo\'limida.',
     'clients.more': 'Barcha fikrlar — Instagram\'da',
@@ -129,7 +123,6 @@ export const DICT = {
   ru: {
     'nav.sale': 'В продаже',
     'nav.reviews': 'Обзоры',
-    'nav.sold': 'Продано',
     'nav.clients': 'Клиенты',
     'nav.about': 'О нас',
     'nav.logistics': 'Логистика',
@@ -205,11 +198,6 @@ export const DICT = {
     'reels.prev': 'Предыдущее видео',
     'reels.next': 'Следующее видео',
     'reels.more': 'Все обзоры — в Instagram',
-
-    'sold.title': 'Продано',
-    'sold.text': 'Часть автомобилей, доставленных нашим клиентам. Полный список — в разделе «Sotildi» в Instagram.',
-    'sold.badge': 'Продано',
-    'sold.more': 'Смотреть в Instagram',
 
     'clients.title': 'Отзывы клиентов',
     'clients.text': 'Видео и отзывы клиентов, получивших свои автомобили, — в разделе «Mijozlar» в Instagram.',

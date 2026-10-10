@@ -67,7 +67,6 @@
     <nav class="nav__links" id="navLinks">
       <a href="#sotuvda" data-i18n="nav.sale">Sotuvda</a>
       <a href="#obzorlar" data-i18n="nav.reviews">Obzorlar</a>
-      <a href="#sotildi" data-i18n="nav.sold">Sotildi</a>
       <a href="#mijozlar" data-i18n="nav.clients">Mijozlar</a>
       <a href="#biz-haqimizda" data-i18n="nav.about">Biz haqimizda</a>
       <a href="#logistika" data-i18n="nav.logistics">Logistika</a>
@@ -81,6 +80,7 @@
       <a class="btn btn--sm nav__cta" href="https://t.me/+ETmfnYnu1mVkMjk1" target="_blank" rel="noopener" data-i18n="nav.cta">Bog'lanish</a>
       <button class="nav__burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span><span></span></button>
     </div>
+    <span class="nav__progress" aria-hidden="true"><i id="progress"></i></span>
   </header>
 
   <main id="top">
@@ -177,6 +177,16 @@
       </div>
     </section>
 
+    <!-- ============ BRENDLAR ============
+         Hikoya oxirida 3D sahna ustiga "parda" bo'lib ko'tariladi; lenta skroll tezligi bilan tezlashadi (src/motion.js) -->
+    <div class="curtain" aria-hidden="true">
+      <div class="marquee" id="marquee">
+        <div class="marquee__track">
+          <span>Mercedes-Benz</span><span class="is-o">Porsche</span><span>BMW</span><span class="is-o">Range Rover</span><span>Rolls-Royce</span><span class="is-o">Lamborghini</span><span>Maybach</span><span class="is-o">Cadillac</span><span>Kia</span>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ SOTUVDA ============ -->
     <section class="section section--light" id="sotuvda">
       <div class="wrap">
@@ -211,20 +221,6 @@
       </div>
     </section>
 
-    <!-- ============ SOTILDI ============ -->
-    <section class="section section--white" id="sotildi">
-      <div class="wrap">
-        <header class="sec-head sec-head--row reveal">
-          <h2 class="sec-title" id="soldTitle" data-i18n="sold.title">Sotildi</h2>
-          <p class="sec-text" data-i18n="sold.text"></p>
-        </header>
-      </div>
-      <div class="sold-strip" id="sold" tabindex="0" role="region" aria-labelledby="soldTitle"></div>
-      <div class="wrap center reveal">
-        <a class="btn btn--navy-ghost" href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener" data-i18n="sold.more">Instagram'da ko'rish</a>
-      </div>
-    </section>
-
     <!-- ============ MIJOZLAR ============ -->
     <section class="section section--light" id="mijozlar">
       <div class="wrap">
@@ -243,7 +239,7 @@
     <section class="section section--navy" id="biz-haqimizda">
       <div class="wrap about">
         <div class="about__copy reveal">
-          <h2 class="sec-title sec-title--light" data-i18n-html="about.title"></h2>
+          <h2 class="sec-title sec-title--light kinetic" id="aboutTitle" data-i18n-html="about.title"></h2>
           <p class="sec-text sec-text--light" data-i18n="about.text"></p>
         </div>
         <div class="stats reveal">
@@ -354,7 +350,6 @@
       <nav class="footer__links">
         <a href="#sotuvda" data-i18n="nav.sale"></a>
         <a href="#obzorlar" data-i18n="nav.reviews"></a>
-        <a href="#sotildi" data-i18n="nav.sold"></a>
         <a href="#mijozlar" data-i18n="nav.clients"></a>
         <a href="#biz-haqimizda" data-i18n="nav.about"></a>
         <a href="#logistika" data-i18n="nav.logistics"></a>
@@ -368,6 +363,11 @@
       </div>
     </div>
     <div class="wrap footer__bottom"><span data-i18n="footer.rights"></span></div>
+    <!-- katta belgi: sahifa oxiriga yetganda pastdan ko'tariladi (src/motion.js) -->
+    <div class="footer__mark" id="footerMark" aria-hidden="true">
+      <svg viewBox="0 0 634 200"><use href="#hm-logo" /></svg>
+      <span>GROUP</span>
+    </div>
   </footer>
 
   <!-- Obzor videosi: kartochka bosilganda shu oynada ovozi bilan o'ynaydi (src/main.js → openPlayer) -->

@@ -1,9 +1,10 @@
 import Lenis from 'lenis';
-import { CARS, SOLD, GARAGE, GARAGE_START, byId } from './data/cars.js';
+import { GARAGE, GARAGE_START, byId } from './data/cars.js';
 import { STOCK, REELS, reelUrl } from './data/stock.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
 import { seg } from './three/story.js';
+import { initMotion } from './motion.js';
 
 const TG = 'https://t.me/+ETmfnYnu1mVkMjk1';
 const IG = 'https://www.instagram.com/hmgroup.uz/';
@@ -77,7 +78,7 @@ new IntersectionObserver(([en]) => {
   if (en.isIntersecting) navLinks.forEach((a) => { a.classList.remove('is-current'); a.removeAttribute('aria-current'); });
 }, { rootMargin: '-45% 0px -50% 0px' }).observe($('#story'));
 
-// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Sotildi, Mijozlar ----------------
+// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Mijozlar ----------------
 // sayt papkada joylashsa ham ishlashi uchun (masalan, GitHub Pages: /HM-group/)
 const BASE = import.meta.env.BASE_URL;
 const renderSrc = (id) => `${BASE}renders/${id}.webp`;
@@ -281,20 +282,8 @@ $('#filters').addEventListener('click', (e) => {
   });
 });
 
-function renderSold() {
-  const inCls = seen($('#sold'));
-  $('#sold').innerHTML = SOLD.map((id) => {
-    const c = byId(id);
-    return `<div class="sold-card reveal${inCls}">
-      <div class="sold-card__media"><img src="${renderSrc(id)}" alt="${c.brand} ${c.model}" loading="lazy" onerror="this.remove()"><span class="sold-card__stamp">${t('sold.badge')}</span></div>
-      <div class="sold-card__body"><strong>${c.brand} ${c.model}</strong><span>${c.year}</span></div>
-    </div>`;
-  }).join('');
-  observeReveal($('#sold'));
-}
-
 function renderClients() {
-  const ids = ['staria', 'g63', 'ev9', 'escalade'];
+  const ids = ['sportage', 'g63', 'ev9', 'escalade'];
   const inCls = seen($('#clients'));
   $('#clients').innerHTML = ids.map((id) => {
     const c = byId(id);
@@ -371,11 +360,12 @@ function updateLogistics() {
 }
 new IntersectionObserver(([en]) => { logActive = en.isIntersecting; updateLogistics(); }, { rootMargin: '10% 0px' }).observe($('#logistika'));
 
-function renderAll() { renderCatalog(); renderSold(); renderClients(); }
+function renderAll() { renderCatalog(); renderClients(); }
 renderAll();
 renderReels();
 observeReveal();
-onLang(() => { renderAll(); updateReels(); updateShowcase(); updateHint(); });
+const motion = initMotion({ lenis, reduce: REDUCE });
+onLang(() => { renderAll(); updateReels(); updateShowcase(); updateHint(); motion.refresh(); });
 
 // ---------------- 3D hikoya qatlamlari ----------------
 const layers = {
@@ -490,8 +480,10 @@ function fillTip(i) {
 }
 
 // ---------------- Header holati ----------------
+// "parda" (brendlar lentasi) hikoya tugashidan oldin 3D ustiga chiqadi — header u yuqoriga yetganda oq bo'ladi
+const curtainEl = $('.curtain');
 function updateNav(y) {
-  const pastStory = y > story.offsetTop + story.offsetHeight - 90;
+  const pastStory = y > curtainEl.offsetTop - 90;
   nav.classList.toggle('is-solid', pastStory);
 }
 
@@ -522,7 +514,8 @@ function splitWords(root) {
           w.className = 'w';
           const inner = document.createElement('span');
           inner.textContent = part;
-          inner.style.setProperty('--d', 120 + n++ * 55);
+          // darvoza sarlavha ustidan o'tib bo'lgach ko'tariladi (styles.css → .loader::before)
+          inner.style.setProperty('--d', 640 + n++ * 65);
           w.append(inner);
           frag.append(w);
         });
@@ -548,6 +541,17 @@ function handoffLogo(done) {
   ], { duration: 950, easing: EASE_OUT, fill: 'forwards' });
   anim.onfinish = done;
   anim.oncancel = done;
+}
+
+// Kirish: darvoza ko'tarilayotganda garaj chiroqlari yonadi, kamera uzoqdan kirib keladi (story.js, world.js)
+function playIntro() {
+  if (!world || world.intro <= 0) return;
+  const T = 3600, t0 = performance.now();
+  const step = (now) => {
+    world.intro = Math.max(0, 1 - (now - t0) / T);
+    if (world.intro > 0) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // ---------------- 3D ishga tushirish ----------------
@@ -576,6 +580,9 @@ async function boot() {
     await world.init();
     world.targetP = DEBUG_P !== null ? parseFloat(DEBUG_P) : progressAt(lenis.scroll || scrollY);
     world.p = world.targetP;
+    // kirish: darvoza ochilguncha garaj qorong'i, kamera uzoqda (playIntro). Sahifa havola bilan
+    // o'rtasidan ochilsa (#sotuvda) — kerak emas
+    if (!REDUCE && DEBUG_P === null && world.targetP < 0.01) world.intro = 1;
     if (import.meta.env.DEV) {
       Object.assign(window, { __world: world, __lenis: lenis, __setP: (p) => { world.targetP = world.p = p; } });
     }
@@ -609,6 +616,7 @@ async function boot() {
   setTimeout(() => {
     loader.classList.add('is-done');
     document.body.classList.add('is-ready');
+    playIntro();
     handoffLogo(() => {
       document.body.classList.remove('is-loading');
       lenis.start();

@@ -428,6 +428,16 @@ export function createStory(world) {
 
     // --- kamera ---
     const fov = sampleCam(p);
+    // kirish (sayt ochilganda): kamera chetdan, yuqoridan va uzoqdan garajga kirib keladi.
+    // expo.out — tez boshlanib, uzoq va yumshoq to'xtaydi; garaj devori va shiftidan chiqib ketmaydi
+    if (world.intro > 0) {
+      const u = 1 - world.intro;
+      const k = Math.pow(2, -10 * u) * (1 - u);
+      camPos.x = THREE.MathUtils.clamp(camPos.x - 7 * k, 3 - G.halfW, G.halfW - 3);
+      camPos.y = Math.min(G.ceilY - 1.1, camPos.y + 3.4 * k);
+      camPos.z = Math.min(G.frontZ - 1.5, camPos.z + 8 * k);
+      camTgt.y -= 0.5 * k;
+    }
     if (Math.abs(fov - curFov) > 0.01 || Math.abs(curShift - appliedShift) > 1e-4 || world.projDirty) {
       curFov = fov; camera.fov = fov; camera.updateProjectionMatrix();
       // lens shift: rasmni vertikal siljitadi (perspektiva buzilmaydi)
