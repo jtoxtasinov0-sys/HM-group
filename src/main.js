@@ -180,7 +180,8 @@ const rail = $('#rail');
 const railItems = $$('#rail li');
 const railFill = $('#railFill');
 const daysNum = $('#daysNum');
-let lastDays = -1;
+const DAYS = [40, 45]; // Koreyadan O'zbekistonga yetkazish muddati (kun)
+let lastDays = '';
 
 function updateLayers(p) {
   setLayer('hero', 1 - seg(p, 0.002, 0.016));
@@ -189,8 +190,9 @@ function updateLayers(p) {
   const idx = p < 0.27 ? 0 : p < 0.53 ? 1 : p < 0.79 ? 2 : 3;
   railItems.forEach((li, i) => li.classList.toggle('is-active', i <= idx));
   rail.classList.toggle('is-hidden', p < 0.01);
-  const days = Math.round(25 * seg(p, 0.815, 0.9));
-  if (days !== lastDays) { lastDays = days; daysNum.textContent = String(days); }
+  const k = seg(p, 0.815, 0.9);
+  const days = `${Math.round(DAYS[0] * k)}–${Math.round(DAYS[1] * k)}`;
+  if (days !== lastDays) { lastDays = days; daysNum.textContent = days; }
 }
 
 // ---------------- Tanlangan mashina ma'lumotlari ----------------

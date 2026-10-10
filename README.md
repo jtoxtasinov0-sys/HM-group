@@ -12,7 +12,7 @@ Skroll orqali hikoya qiluvchi premium sayt:
 3. **Konteyner**: eshik ochiladi, mashina HM GROUP konteyneriga kiradi, eshiklar yopiladi.
 4. **Kema**: hovli asta portga almashadi (konteyner joyida qoladi — "match dissolve"), kran konteynerni
    ko'taradi va strela bo'ylab kemadagi bo'sh uyachaga qo'yadi.
-5. **Yetkazish**: kema quyosh tomon suzib ketadi — "~25 kun".
+5. **Yetkazish**: kema quyosh tomon suzib ketadi — "40–45 kun".
 
 Undan keyin oddiy bo'limlar keladi: Sotuvda, Sotildi, Mijozlar, Biz haqimizda, Logistika, Kontakt.
 Sayt ikki tilli (UZ / RU) va telefonga moslashgan.
