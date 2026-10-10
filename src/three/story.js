@@ -364,8 +364,7 @@ export function createStory(world) {
       world.outline.material.opacity = show * 0.85;
       world.outline.visible = show > 0.001;
 
-      // sahna logosi va chiroqlar
-      A.stageLogo.material.opacity = 0.55 * (1 - seg(p, 0.03, 0.08));
+      // sahna chiroqlari
       const stageOn = seg(p, 0.05, 0.11) * (1 - seg(p, T.driveA, T.driveA + 0.05));
       A.stageSpot.intensity = 55 * stageOn;
       A.stage.rimMat.color.copy(A.stage.base).multiplyScalar(1 + 2.2 * stageOn);
@@ -385,11 +384,14 @@ export function createStory(world) {
         // qo'shnilar 4 m narida, aylansa ularga kirib ketadi (0..0.5 rad oralig'i xavfsiz)
         const face = Math.sign(e.slot.yaw) * (0.12 + 0.1 * Math.sin(time * 0.7 + i)) - e.slot.yaw;
         e.spinAngle = damp(e.spinAngle, target ? face : 0, target || heroLive ? 2.4 : isSel ? 14 : 5, dt);
-        e.spin.rotation.y = e.spinAngle;
-        e.lift.scale.setScalar(1 + 0.12 * h);
+        // fonda yuklangan mashina paydo bo'ladi: platformada kichik burilish bilan o'sib chiqadi, halqa yonadi
+        if (e.appear < 1) e.appear = Math.min(1, e.appear + dt / 0.9);
+        const ap = 1 - Math.pow(1 - e.appear, 3);
+        e.spin.rotation.y = e.spinAngle + 0.8 * (1 - ap);
+        e.lift.scale.setScalar((1 + 0.12 * h) * (0.86 + 0.14 * ap));
         e.lift.position.y = 0.05 * h;
         e.turntable.group.rotation.y = e.slot.yaw + e.spinAngle;
-        e.turntable.rimMat.color.copy(e.turntable.base).multiplyScalar(1 + 3.2 * h - (isSel ? 0 : 0.6 * selDim));
+        e.turntable.rimMat.color.copy(e.turntable.base).multiplyScalar(1 + 3.2 * h + 2.4 * (1 - ap) - (isSel ? 0 : 0.6 * selDim));
 
         if (isSel && p > T.heroEnd) placeSelected(e, p, dt);
         else parkAtSlot(e);
@@ -426,6 +428,16 @@ export function createStory(world) {
 
     // --- kamera ---
     const fov = sampleCam(p);
+    // kirish (sayt ochilganda): kamera chetdan, yuqoridan va uzoqdan garajga kirib keladi.
+    // expo.out — tez boshlanib, uzoq va yumshoq to'xtaydi; garaj devori va shiftidan chiqib ketmaydi
+    if (world.intro > 0) {
+      const u = 1 - world.intro;
+      const k = Math.pow(2, -10 * u) * (1 - u);
+      camPos.x = THREE.MathUtils.clamp(camPos.x - 7 * k, 3 - G.halfW, G.halfW - 3);
+      camPos.y = Math.min(G.ceilY - 1.1, camPos.y + 3.4 * k);
+      camPos.z = Math.min(G.frontZ - 1.5, camPos.z + 8 * k);
+      camTgt.y -= 0.5 * k;
+    }
     if (Math.abs(fov - curFov) > 0.01 || Math.abs(curShift - appliedShift) > 1e-4 || world.projDirty) {
       curFov = fov; camera.fov = fov; camera.updateProjectionMatrix();
       // lens shift: rasmni vertikal siljitadi (perspektiva buzilmaydi)
