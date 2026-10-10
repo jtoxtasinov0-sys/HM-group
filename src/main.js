@@ -28,6 +28,11 @@ const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
 const lenis = new Lenis({ lerp: 0.085, wheelMultiplier: 0.85, smoothWheel: !REDUCE });
 lenis.stop();
 requestAnimationFrame(function raf(time) { lenis.raf(time); requestAnimationFrame(raf); });
+// Telefonda sahifa dastur bilan aylanayotganda (menyu havolasi, «Tanlash») barmoq tegsa — aylanish to'xtaydi.
+// Aks holda barmoq va animatsiya bir-biriga qarshi ishlab, sahifa "o'zi" ketib qolardi
+addEventListener('touchstart', () => {
+  if (lenis.isScrolling === 'smooth') lenis.scrollTo(lenis.actualScroll, { immediate: true, force: true });
+}, { passive: true });
 
 const story = $('#story');
 const storyRange = () => Math.max(1, story.offsetHeight - innerHeight);
@@ -596,12 +601,13 @@ async function boot() {
     $('#prevCar').addEventListener('click', () => world.setFocus(world.focus - 1));
     $('#nextCar').addEventListener('click', () => world.setFocus(world.focus + 1));
     $('#chooseCar').addEventListener('click', () => { world.selectCar(world.focus); scrollToP(0.178, 2.6); });
-    let sx = null;
-    $('#webgl').addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    // chapga/o'ngga surish — mashina almashadi; yuqoriga/pastga (skroll) — almashmaydi
+    let sx = null, sy = 0;
+    $('#webgl').addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
     $('#webgl').addEventListener('touchend', (e) => {
       if (sx === null || world.p > 0.02) return;
-      const dx = e.changedTouches[0].clientX - sx;
-      if (Math.abs(dx) > 50) world.setFocus(world.focus + (dx < 0 ? 1 : -1));
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) world.setFocus(world.focus + (dx < 0 ? 1 : -1));
       sx = null;
     }, { passive: true });
 

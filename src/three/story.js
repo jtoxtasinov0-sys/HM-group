@@ -94,14 +94,17 @@ export function createStory(world) {
     return { pos: V(m.x * h.pan, h.y + m.y * 0.25, D), tgt: V(m.x * h.pan * 0.8, h.ty, -1.5), fov: h.fov, shift: h.shift };
   };
   const pr = () => world.portrait;
+  // Telefonda (portret) ekran tor — kompyuterdagi kadrlarda mashina va konteyner chetlardan kesilib, kamera
+  // "yopishib" qolardi. Garajda (ochiq joy) kamera uzoqroq turadi; eshik va hovlida yo'li devorga tegmasligi uchun
+  // joyi o'sha, lekin obyektiv kengroq (fov) va kadr biroz tepaga (shift < 0) — pastdagi panel mashinani yopmasin
   const KF = [
     { p: 0, cam: heroCam },
-    { p: T.moveB, cam: () => ({ pos: pr() ? V(4.2, 2.6, 16.5) : V(4.7, 1.95, 12.6), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
-    { p: T.showB, cam: () => ({ pos: pr() ? V(-4.4, 2.8, 16.2) : V(-4.9, 2.2, 12.0), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
-    { p: T.driveA, cam: () => ({ pos: V(2.4, 2.9, 11.2), tgt: V(0, 1.3, -8), fov: pr() ? 52 : 34 }) },
-    { p: 0.36, cam: () => ({ pos: V(1.6, 2.6, 5.0), tgt: V(0, 1.2, -12), fov: pr() ? 52 : 36 }) },
-    { p: T.driveB, cam: () => ({ pos: V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 56 : 38 }) },
-    { p: T.closeB, cam: () => ({ pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: pr() ? 56 : 38 }) },
+    { p: T.moveB, cam: () => ({ pos: pr() ? V(3.4, 3.2, 19.6) : V(4.7, 1.95, 12.6), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
+    { p: T.showB, cam: () => ({ pos: pr() ? V(-3.6, 3.3, 19.4) : V(-4.9, 2.2, 12.0), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
+    { p: T.driveA, cam: () => ({ pos: pr() ? V(2.2, 3.6, 16.0) : V(2.4, 2.9, 11.2), tgt: V(0, 1.3, -8), fov: pr() ? 54 : 34, shift: pr() ? -0.06 : 0 }) },
+    { p: 0.36, cam: () => ({ pos: pr() ? V(0.9, 2.8, 5.8) : V(1.6, 2.6, 5.0), tgt: V(0, 1.2, -12), fov: pr() ? 68 : 36, shift: pr() ? -0.14 : 0 }) },
+    { p: T.driveB, cam: () => ({ pos: V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 66 : 38, shift: pr() ? -0.1 : 0 }) },
+    { p: T.closeB, cam: () => ({ pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: pr() ? 70 : 38, shift: pr() ? -0.1 : 0 }) },
     { p: T.spreadB, cam: () => ({ pos: V(8.5, 3.6, -11.2), tgt: V(0, 2.0, G.container.z), fov: pr() ? 58 : 38 }) },
     // ko'tarilish — kamera konteyner bilan birga, kran portali ichida (oyoqlar va to'sinlardan uzoqda):
     // eshiklar va yon tomon ko'rinadi, orqada port steklari

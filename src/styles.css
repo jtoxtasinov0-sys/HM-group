@@ -176,6 +176,9 @@ h1, h2, h3, p { margin: 0; }
 }
 .hero { color: var(--deep); }
 .hero { isolation: isolate; inset: 0 0 var(--vb) 0; padding: 150px var(--gutter) 40px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+/* hero butun ekranni egallaydi: uning bo'sh joylari bosish va surishni ostidagi 3D sahnaga o'tkazadi
+   (.layer.is-on dan kuchliroq) — kompyuterda mashinani bosib tanlash, telefonda surib almashtirish ishlaydi */
+.layer.hero.is-on { pointer-events: none; }
 .hero__copy { max-width: 640px; pointer-events: auto; }
 .hero__title {
   margin: 0 0 18px;

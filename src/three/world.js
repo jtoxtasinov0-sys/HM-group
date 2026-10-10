@@ -631,7 +631,12 @@ export class World {
       if (this.p > 0.02) return;
       onMove(e);
       const i = this.pick();
-      if (i >= 0) { this.selectCar(i); this.emit('choose', i); }
+      if (i < 0) return;
+      // Telefonda bosish faqat o'sha mashinaga o'tkazadi. Avval tanlab, sahifani o'zi aylantirardi: skroll qilmoqchi
+      // bo'lgan barmoq mashinaga tegsa, sayt tepaga ketib, kamera yaqinlashardi. Tanlash — «Tanlash» tugmasi bilan
+      if (this.quality.mobile || this.portrait) { this.setFocus(i); return; }
+      this.selectCar(i);
+      this.emit('choose', i);
     });
   }
 
@@ -731,8 +736,9 @@ export class World {
     if (!this.active || this.contextLost) return;
     this.adaptQuality(performance.now());
 
-    // scroll progressi — yumshoq
-    const k = 1 - Math.exp(-dt * 7);
+    // scroll progressi — yumshoq. Telefonda barmoq bilan surish keskin (bir siljitishda bir necha ekran) —
+    // kamera sakramasin, sekinroq ergashadi
+    const k = 1 - Math.exp(-dt * (this.quality.mobile ? 3.6 : 7));
     this.p += (this.targetP - this.p) * k;
     if (Math.abs(this.targetP - this.p) < 1e-5) this.p = this.targetP;
     this.mouseSmooth.lerp(this.mouse, 1 - Math.exp(-dt * 3));
