@@ -177,8 +177,6 @@ export class World {
 
   async init() {
     const { quality } = this;
-    // modellar darhol so'raladi: sahna qurilayotganda (protsessor ishi) tarmoqdan yuklash ham ketaveradi
-    this.startLoading();
     const renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     renderer.setPixelRatio(quality.dpr);
     renderer.setSize(innerWidth, innerHeight, false);
@@ -188,6 +186,8 @@ export class World {
     renderer.shadowMap.enabled = quality.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer = renderer;
+    // modellar darhol so'raladi (WebGL ishlasa): sahna qurilayotganda tarmoqdan yuklash ham ketaveradi
+    this.startLoading();
 
     const scene = new THREE.Scene();
     this.scene = scene;
