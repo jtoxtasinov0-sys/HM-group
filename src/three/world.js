@@ -533,7 +533,8 @@ export class World {
       get(fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true)))
         .catch((err) => console.warn('car load failed', e.car.id, err));
     }
-    this.later(() => this.warmPort());
+    // port shaderlari — sayt ochilish animatsiyasi tugagach (u silliq o'tsin)
+    setTimeout(() => this.later(() => this.warmPort()), 1500);
     get('ship').then((g) => this.later(async () => {
       await idle();
       const ship = g.scene;
