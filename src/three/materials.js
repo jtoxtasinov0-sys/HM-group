@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // Avtomobil bo'yoqlari — ko'p qatlamli lak (clearcoat) bilan
 export const PAINTS = {
@@ -94,7 +95,10 @@ export function prepareCarMaterials(root, car) {
 
   root.traverse((o) => {
     if (!o.isMesh) return;
+    if (car.hideRe && !Array.isArray(o.material) && car.hideRe.test(o.material.name)) { o.visible = false; return; }
     o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material);
+    // siqishda buzilgan kuzov normallari qayta hisoblanadi: tekis joylar silliq, keskin qirralar saqlanadi
+    if (car.creaseNormals && o.material === paint) o.geometry = toCreasedNormals(o.geometry, THREE.MathUtils.degToRad(car.creaseNormals));
     (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => seen.add(m));
   });
 

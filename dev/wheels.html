@@ -8,11 +8,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { CARS } from '/src/data/cars.js';
+import { CARS, GARAGE } from '/src/data/cars.js';
 import { rigWheels } from '/src/three/wheels.js';
 
 const q = new URLSearchParams(location.search);
-const ids = (q.get('m') || CARS.filter((c) => c.garage).map((c) => c.id).join(',')).split(',');
+const ids = (q.get('m') || GARAGE.map((c) => c.id).join(',')).split(',');
 const W = 1400, H = 700;
 const r = new THREE.WebGLRenderer({ antialias: true });
 r.setSize(W, H);
@@ -26,7 +26,7 @@ const lines = [];
 const rigs = [];
 for (let k = 0; k < ids.length; k++) {
   const car = CARS.find((c) => c.id === ids[k]);
-  const g = await loader.loadAsync(`/models/${car.id}.glb`);
+  const g = await loader.loadAsync(`/models/${car.file || car.id}.glb`);
   const model = g.scene;
   const holder = new THREE.Group();
   holder.add(model);

@@ -118,27 +118,37 @@ export function detectQuality() {
   };
 }
 
+/** Modelning mustaqil nusxasi: tugunlar va materiallar alohida (geometriya umumiy) — boshqa rangga bo'yash uchun */
+function cloneCar(src) {
+  const model = src.clone(true);
+  const mats = new Map();
+  const dup = (m) => { if (!mats.has(m)) mats.set(m, m.clone()); return mats.get(m); };
+  model.traverse((o) => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(dup) : dup(o.material); });
+  return model;
+}
+
 export class World {
-  constructor(canvas, { cars, manifest, quality, onProgress }) {
+  constructor(canvas, { cars, start = 0, manifest, quality, onProgress }) {
     this.canvas = canvas;
-    this.cars = cars;
+    this.cars = cars; // garajdagi mashinalar, joylar tartibida (G.slots)
     this.manifest = manifest;
     this.quality = quality;
     this.onProgress = onProgress;
     this.p = 0;
     this.targetP = 0;
-    this.selected = 2;
+    this.selected = start;
     this.hovered = -1;
     this.pointer = new THREE.Vector2(9, 9);
     this.mouse = new THREE.Vector2(0, 0);      // parallaks uchun (-1..1)
     this.mouseSmooth = new THREE.Vector2(0, 0);
-    this.focus = 2;                              // mobil: kamera qaysi mashinaga qarayapti
-    this.focusSmooth = 2;
+    this.focus = start;                          // mobil: kamera qaysi mashinaga qarayapti
+    this.focusSmooth = start;
     this.active = true;
     this.listeners = { frame: new Set(), select: new Set(), hover: new Set(), choose: new Set() };
     this.clock = new THREE.Clock();
     // hero kamerasi (desktop)
-    this.heroTune = { fov: 34, fit: 10.6, y: 2.0, ty: 1.55, shift: 0.36, pan: 3.2 };
+    // mDist/mY/mShift — telefonda (portret): kamera masofasi ko'paytiruvchisi, balandligi, kadr siljishi
+    this.heroTune = { fov: 34, fit: 15.5, y: 2.0, ty: 1.55, shift: 0.36, pan: 5, mDist: 1.7, mY: 3.5, mShift: 0.35 };
     this.time = 0;
     // 0 — garaj/hovli, 1 — port; oraliqda ikkala dunyo chiziladi va asta almashadi
     this.blend = 0;
@@ -295,36 +305,32 @@ export class World {
 
   async loadAll() {
     const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    const garageCars = this.cars.filter((c) => c.garage);
-    const files = [...garageCars.map((c) => c.id), 'ship'];
-    const total = files.reduce((s, id) => s + (this.manifest[id]?.bytes || 3e6), 0);
-    const loaded = Object.fromEntries(files.map((f) => [f, 0]));
-    const report = () => {
-      const sum = Object.values(loaded).reduce((a, b) => a + b, 0);
-      this.onProgress?.(Math.min(1, sum / total));
+    const fileOf = (car) => car.file || car.id;
+    const bytesOf = (f) => this.manifest[f]?.bytes || 3e6;
+    const files = new Map(); // fayl → Promise<gltf> (bir fayl bir marta yuklanadi)
+    const fetchFile = (f, onBytes) => {
+      if (!files.has(f)) {
+        files.set(f, new Promise((resolve, reject) => {
+          loader.load(`${import.meta.env.BASE_URL}models/${f}.glb`, (g) => { onBytes?.(f, bytesOf(f)); resolve(g); },
+            (e) => onBytes?.(f, e.loaded), reject);
+        }));
+      }
+      return files.get(f);
     };
-    const load = (id) => new Promise((resolve, reject) => {
-      loader.load(`${import.meta.env.BASE_URL}models/${id}.glb`, (g) => { loaded[id] = this.manifest[id]?.bytes || loaded[id]; report(); resolve(g); },
-        (e) => { loaded[id] = Math.min(e.loaded, this.manifest[id]?.bytes || e.loaded); report(); }, reject);
-    });
 
     const shadowTex = makeShadowTexture();
     const shadowMat = new THREE.MeshBasicMaterial({ alphaMap: shadowTex, color: '#0b0f16', transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
 
-    // mashinalar parallel yuklanadi
-    const gltfs = await Promise.all(garageCars.map((c) => load(c.id)));
-    this.entities = garageCars.map((car, i) => {
-      const model = gltfs[i].scene;
-      const rig = rigWheels(model, car.wheels);
-      const { mats } = prepareCarMaterials(model, car);
-      model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
-      const box = this.manifest[car.id]?.box || { min: [-1, 0, -2.5], max: [1, 1.6, 2.5] };
+    // Avval har bir joy modelsiz quriladi (o'lchami manifestdan): soya, sichqoncha qutisi, platforma.
+    // Model kelganda ichiga qo'yiladi — garaj markazdagi mashinalar bilan ochiladi, chetdagilari keyin qo'shiladi.
+    this.entities = this.cars.map((car, i) => {
+      const box = this.manifest[fileOf(car)]?.box || { min: [-1, 0, -2.5], max: [1, 1.6, 2.5] };
       const size = new THREE.Vector3(box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]);
 
       const root = new THREE.Group();           // joylashuv (slot / sahna / konteyner)
       const lift = new THREE.Group();           // hover: ko'tarilish + kattalashish
       const spin = new THREE.Group();           // aylanish
-      root.add(lift); lift.add(spin); spin.add(model);
+      root.add(lift); lift.add(spin);
       const shadow = new THREE.Mesh(new THREE.PlaneGeometry(size.x + 0.9, size.z + 1.1), shadowMat);
       shadow.rotation.x = -Math.PI / 2;
       shadow.position.y = 0.005;
@@ -339,16 +345,49 @@ export class World {
       root.position.set(slot.x, G.ttH, slot.z);
       root.rotation.y = slot.yaw;
       this.fleet.add(root);
+      // model kelguncha: g'ildiraksiz "rig" (o'qlar taxminiy)
+      const rig = { front: size.z * 0.3, back: -size.z * 0.3, body: new THREE.Group(), roll() {}, steer() {} };
       return {
-        car, model, mats, root, lift, spin, shadow, hit, size, slot, rig,
-        hover: 0, spinAngle: 0, spinVel: 0, dim: 1,
+        car, model: null, mats: [], root, lift, spin, shadow, hit, size, slot, rig,
+        hover: 0, spinAngle: 0, dim: 1,
         turntable: this.garage.anim.turntables[i],
       };
     });
     this.hitboxes = this.entities.map((e) => e.hit);
 
-    // kema — fon rejimida
-    this.shipPromise = load('ship').then((g) => {
+    // bir model bir necha mashinada (turli rangda) bo'lsa, har biriga asl nusxadan alohida klon
+    const uses = new Map();
+    for (const e of this.entities) uses.set(fileOf(e.car), (uses.get(fileOf(e.car)) || 0) + 1);
+    const mount = async (e, onBytes, precompile) => {
+      const f = fileOf(e.car);
+      const g = await fetchFile(f, onBytes);
+      const model = uses.get(f) > 1 ? cloneCar(g.scene) : g.scene;
+      const rig = rigWheels(model, e.car.wheels);
+      const { mats } = prepareCarMaterials(model, e.car);
+      model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
+      // sahna ishlab turganda shaderlar oldindan tayyorlanadi — mashina paydo bo'lganda kadr qotmaydi
+      if (precompile) await this.renderer.compileAsync(model, this.camera, this.scene).catch(() => {});
+      e.spin.add(model);
+      Object.assign(e, { model, rig, mats, dim: 1 });
+    };
+
+    // birinchi navbat — kompyuter ekranida darhol ko'rinadigan markazdagi mashinalar
+    const first = this.entities.filter((e) => Math.abs(e.slot.x) < 14);
+    const firstFiles = [...new Set(first.map((e) => fileOf(e.car)))];
+    const total = firstFiles.reduce((sum, f) => sum + bytesOf(f), 0);
+    const got = Object.fromEntries(firstFiles.map((f) => [f, 0]));
+    const report = (f, n) => {
+      if (!(f in got)) return;
+      got[f] = Math.min(n, bytesOf(f));
+      this.onProgress?.(Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
+    };
+    await Promise.all(first.map((e) => mount(e, report, false)));
+
+    // qolganlari va kema — fonda
+    for (const e of this.entities) {
+      if (!first.includes(e)) mount(e, null, true).catch((err) => console.warn('car load failed', e.car.id, err));
+    }
+    this.shipPromise = fetchFile('ship').then((g) => {
       const ship = g.scene;
       this.port.setShip(ship);
       this.ship = ship;

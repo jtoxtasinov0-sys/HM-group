@@ -40,10 +40,10 @@ const only = new URLSearchParams(location.search).get('only');
 for (const car of CARS) {
   if (only && !only.split(',').includes(car.id)) continue;
   log(`render ${car.id}...`);
-  const g = await loader.loadAsync(`/models/${car.id}.glb`);
+  const g = await loader.loadAsync(`/models/${car.file || car.id}.glb`);
   const model = g.scene;
   prepareCarMaterials(model, car);
-  const b = manifest[car.id].box;
+  const b = manifest[car.file || car.id].box;
   const size = new THREE.Vector3(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
   const holder = new THREE.Group();
   holder.add(model);

@@ -4,10 +4,11 @@
 
 Skroll orqali hikoya qiluvchi premium sayt:
 
-1. **Garaj**: oq dumaloq showroom (shiftda katta yorug' doira), 6 ta mashina oq platformalarda (qora rezina halqa bilan) turadi.
-   Sichqoncha mashina ustiga borsa, mashina kattalashadi va aylanadi. Bosilsa, o'sha mashina tanlanadi.
+1. **Garaj**: oq dumaloq showroom (shiftda katta yorug' doira), 11 ta mashina bir qatorda oq platformalarda
+   (qora rezina halqa bilan) turadi. Sichqoncha mashina ustiga borsa, mashina kattalashadi va tomoshabinga qarab
+   buriladi. Bosilsa, o'sha mashina tanlanadi. Telefonda ‹ › tugmalari bilan mashinalar almashtiriladi.
 2. **Sahna**: tanlangan mashina joyidan haydab chiqadi (g'ildiraklar aylanadi, old g'ildiraklar buriladi,
-   tormozda kuzov biroz egiladi), markaziy platformaga kiradi va platforma uni aylantiradi, orqada katta nomi ko'rinadi,
+   tormozda kuzov biroz egiladi), markaziy platformaga kiradi va platforma uni ~1–1.3 marta aylantiradi, orqada katta nomi ko'rinadi,
    pastda ma'lumotlar paneli chiqadi (yil, dvigatel, quvvat, probeg).
 3. **Konteyner**: eshik ochiladi, mashina HM GROUP konteyneriga kiradi, eshiklar yopiladi.
 4. **Kema**: hovli asta portga almashadi (konteyner joyida qoladi — "match dissolve"), kran konteynerni
@@ -57,6 +58,7 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 |---|---|
 | Mashinalar (model, yil, dvigatel, ot kuchi, rang, izoh) | `src/data/cars.js` |
 | "Sotildi" ro'yxati | `src/data/cars.js` → `SOLD` |
+| Garajdagi mashinalar va ularning tartibi | `src/data/cars.js` → `GARAGE` (joylar: `src/three/garage.js` → `G.slots`) |
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
 | Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`, `IG`) |
 | Ranglar | `src/styles.css` (`:root`) |
@@ -74,8 +76,9 @@ Asl `.glb` fayllar juda og'ir edi (jami ~1 GB). Ular siqildi va `public/models/`
 geometriya soddalashtirildi, meshopt bilan siqildi, teksturalar WebP ga o'tkazildi
 (masalan, Maybach: 81 MB → 3.4 MB).
 
-Garajdagi mashinalar va kema saytda yuklanadi (~27 MB). `ghost`, `escalade`, `x6`, `sportage`
-faqat katalog rasmlari uchun ishlatilgan.
+Garajdagi barcha mashinalar va kema saytda yuklanadi (~42 MB). Sayt markazdagi 6 ta mashina
+(~16 MB) yuklangach ochiladi, chetdagilari va kema keyin, fonda qo'shiladi. Bir model bir necha
+rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`).
 
 Yangi model qo'shish:
 
@@ -87,7 +90,9 @@ Yangi model qo'shish:
 5. Katalog rasmi: `npm run dev`, keyin http://localhost:5173/dev/render.html oching —
    barcha rasmlar `public/renders/` ga avtomatik saqlanadi.
 
-Garajda mashina bo'lishi uchun `garage: true` qo'ying (6 ta joy bor).
+Garajga mashina qo'shish: `cars.js` dagi `GARAGE` ro'yxatiga id ni yozing va `garage.js` dagi `G.slots` ga
+shuncha joy qo'shing (hozir 11 ta, oraliq 4 m). Joylar surilsa, haydash yo'llari qo'shni mashinalarga
+tegmasligini tekshiring.
 G'ildiraklar avtomatik topiladi (`src/three/wheels.js`). Tekshirish: http://localhost:5173/dev/wheels.html —
 qizil doira g'ildirakka to'g'ri tushmasa, `cars.js` da `wheels: { r: 0.39 }` bilan radiusni bering.
 Kuzov rangi: `paint` (`pearl`, `navy`, `obsidian`, `silver`, `ice`, `graphite` — `src/three/materials.js`).

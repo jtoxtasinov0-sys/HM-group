@@ -1,5 +1,5 @@
 import Lenis from 'lenis';
-import { CARS, SOLD, GARAGE, byId } from './data/cars.js';
+import { CARS, SOLD, GARAGE, GARAGE_START, byId } from './data/cars.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
 import { seg } from './three/story.js';
@@ -197,7 +197,7 @@ function updateLayers(p) {
 
 // ---------------- Tanlangan mashina ma'lumotlari ----------------
 let world = null;
-let selected = GARAGE[2];
+let selected = GARAGE[GARAGE_START];
 
 function updateShowcase() {
   const c = selected;
@@ -277,7 +277,7 @@ async function boot() {
     await document.fonts.load('600 100px Inter').catch(() => {});
     const manifest = await fetch(`${BASE}models/manifest.json`).then((r) => r.json());
     const quality = detectQuality();
-    world = new World($('#webgl'), { cars: CARS, manifest, quality, onProgress: setLoad });
+    world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest, quality, onProgress: setLoad });
     await world.init();
     world.targetP = DEBUG_P !== null ? parseFloat(DEBUG_P) : progressAt(lenis.scroll || scrollY);
     world.p = world.targetP;
