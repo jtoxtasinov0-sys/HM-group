@@ -125,33 +125,103 @@ $('#catalog').addEventListener('scroll', (e) => {
   if (g) syncGallery(g);
 }, { capture: true, passive: true });
 
-// Obzor videolari: Instagram rasmi (embed) ko'rinadi, ustiga bosilsa — Instagram'da ochiladi.
-// Embed bir marta yaratiladi (til almashganda faqat matn yangilanadi — videolar qayta yuklanmaydi).
+// Obzor videolari (public/reels, npm run reels): kartochkalarda hamma videolar ovozsiz o'ynab turadi
+// (12 soniyalik parcha), bosilsa — katta oynada to'liq video ovozi bilan. Kartochkalar bir marta yaratiladi
+// (til almashganda faqat matn yangilanadi — videolar qayta yuklanmaydi).
+const reelSrc = (id, suffix) => `${BASE}reels/${id}${suffix}`;
+const SOUND_ICON = '<svg class="ig-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
+const MUTED_ICON = '<svg class="ig-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
+const player = $('#player');
+const playerVideo = $('.player__video', player);
+let playerIndex = 0;
+
+// Ekranda ko'rinib turgan har bir video o'ynaydi (bir piksel ko'rinsa ham), ko'rinmaydigani to'xtaydi — trafik tejaladi.
+// Telefonda «trafik tejash» yoqilgan bo'lsa — faqat muqova.
+const PREVIEW_AUTOPLAY = !navigator.connection?.saveData;
+const previewIO = new IntersectionObserver((entries) => {
+  entries.forEach((en) => { en.target._inView = en.isIntersecting; syncPreview(en.target); });
+}, { rootMargin: '120px 0px' });
+function syncPreview(v) {
+  if (v._inView && !player.open) v.play().catch(() => {});
+  else v.pause();
+}
+
 function renderReels() {
   $('#reels').innerHTML = REELS.map((r, i) => `
     <article class="reel reveal">
-      <div class="reel__frame" aria-hidden="true">
-        <iframe src="https://www.instagram.com/reel/${r.id}/embed/" loading="lazy" scrolling="no" tabindex="-1" title="Instagram"></iframe>
-      </div>
-      <span class="reel__play" aria-hidden="true"></span>
+      <video class="reel__video" src="${reelSrc(r.id, '-preview.mp4')}" poster="${reelSrc(r.id, '.webp')}" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true"></video>
+      <span class="reel__muted" aria-hidden="true">${MUTED_ICON}</span>
       <div class="reel__cap">
-        <span class="reel__n">${String(i + 1).padStart(2, '0')}</span>
         <strong class="reel__title"></strong>
-        <span class="reel__go">${IG_ICON}<span class="reel__open"></span> ↗</span>
+        <span class="reel__go">${SOUND_ICON}<span class="reel__watch"></span></span>
       </div>
-      <a class="reel__link" href="${reelUrl(r.id)}" target="_blank" rel="noopener"></a>
+      <button type="button" class="reel__link" data-reel="${i}"></button>
     </article>`).join('');
   updateReels();
   observeReveal($('#reels'));
+  $$('#reels .reel__video').forEach((v) => {
+    v.muted = true; // avtomatik o'ynash faqat ovozsiz videoga ruxsat etiladi
+    if (PREVIEW_AUTOPLAY) previewIO.observe(v);
+  });
 }
 function updateReels() {
   $$('#reels .reel').forEach((el, i) => {
     const title = REELS[i].title[lang()];
     $('.reel__title', el).textContent = title;
-    $('.reel__open', el).textContent = t('reels.open');
-    $('.reel__link', el).setAttribute('aria-label', `${title} — ${t('reels.open')}`);
+    $('.reel__watch', el).textContent = t('reels.watch');
+    $('.reel__link', el).setAttribute('aria-label', `${title} — ${t('reels.watch')}`);
   });
 }
+$('#reels').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-reel]');
+  if (b) openPlayer(Number(b.dataset.reel));
+});
+
+// play() bosish ichida chaqiriladi — brauzer ovozli videoni shundagina o'ynatadi
+function openPlayer(i) {
+  playerIndex = (i + REELS.length) % REELS.length;
+  const r = REELS[playerIndex];
+  playerVideo.poster = reelSrc(r.id, '.webp');
+  playerVideo.src = reelSrc(r.id, '.mp4');
+  updatePlayer();
+  if (!player.open) {
+    player.showModal();
+    document.documentElement.classList.add('has-player');
+    $$('#reels .reel__video').forEach(syncPreview);
+  }
+  playerVideo.play().catch(() => {});
+}
+function updatePlayer() {
+  const r = REELS[playerIndex];
+  const title = r.title[lang()];
+  $('.player__title', player).textContent = title;
+  player.setAttribute('aria-label', title);
+  const ig = $('.player__ig', player);
+  ig.href = reelUrl(r.id);
+  ig.innerHTML = `${IG_ICON}<span>${t('reels.open')}</span> ↗`;
+  $('[data-close]', player).setAttribute('aria-label', t('reels.close'));
+  $('.player__nav--prev', player).setAttribute('aria-label', t('reels.prev'));
+  $('.player__nav--next', player).setAttribute('aria-label', t('reels.next'));
+}
+player.addEventListener('click', (e) => {
+  // oynaning bo'sh joyi (video atrofi) yoki × — yopiladi
+  if (e.target === player || e.target.closest('[data-close]')) { player.close(); return; }
+  const nav = e.target.closest('[data-dir]');
+  if (nav) openPlayer(playerIndex + Number(nav.dataset.dir));
+});
+player.addEventListener('keydown', (e) => {
+  // video tanlangan bo'lsa, strelkalar videoni oldinga/orqaga suradi (brauzerning o'zi)
+  if (e.target === playerVideo || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  e.preventDefault();
+  openPlayer(playerIndex + (e.key === 'ArrowRight' ? 1 : -1));
+});
+player.addEventListener('close', () => {
+  playerVideo.pause();
+  playerVideo.removeAttribute('src');
+  playerVideo.load(); // yuklashni to'xtatadi
+  document.documentElement.classList.remove('has-player');
+  $$('#reels .reel__video').forEach(syncPreview);
+});
 function applyFilter() {
   $$('#catalog .card').forEach((c) => c.classList.toggle('is-hidden', filter !== 'all' && c.dataset.type !== filter));
   $$('#filters .chip').forEach((b) => b.classList.toggle('is-active', b.dataset.filter === filter));

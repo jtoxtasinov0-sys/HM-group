@@ -19,7 +19,8 @@ Undan keyin oddiy bo'limlar keladi: Sotuvda, Obzorlar, Sotildi, Mijozlar, Biz ha
 
 - **Sotuvda** — haqiqiy mashinalar (Instagram e'lonlaridan): har birida 4 ta rasm (surib ko'riladi), ma'lumotlar,
   «Instagram» (postga) va «Ma'lumot olish» tugmalari. Filtr: SUV / Sedan / Sport.
-- **Obzorlar** — Instagram Reels videolari: kartochkada video rasmi ko'rinadi, bosilsa Instagram'da ochiladi.
+- **Obzorlar** — Instagram Reels videolari saytning o'zida: kartochkalarda hamma videolar ovozsiz o'ynab turadi (12 soniyalik parcha),
+  bosilsa katta oynada to'liq video ovozi bilan ochiladi (‹ › — keyingi video, oynada «Instagram'da ochish» ham bor).
 Sayt ikki tilli (UZ / RU) va telefonga moslashgan.
 
 ## Ishga tushirish
@@ -61,7 +62,7 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Nima | Qayerda |
 |---|---|
 | Sotuvdagi mashinalar (rasm, yil, dvigatel, ot kuchi, rang, Instagram post) | `src/data/stock.js` → `STOCK` |
-| Obzor videolari (Instagram Reels) | `src/data/stock.js` → `REELS` |
+| Obzor videolari (Instagram Reels) | `src/data/stock.js` → `REELS`, fayllar `public/reels/` (`npm run reels`) |
 | 3D garajdagi mashinalar | `src/data/cars.js` |
 | "Sotildi" ro'yxati | `src/data/cars.js` → `SOLD` |
 | Garajdagi mashinalar va ularning tartibi | `src/data/cars.js` → `GARAGE` (joylar: `src/three/garage.js` → `G.slots`) |
@@ -81,7 +82,14 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 2. `src/data/stock.js` dagi `STOCK` ga mashinani qo'shing (`dir` — papka nomi, `photos` — rasmlar soni, `ig` — Instagram post).
 3. `npm run photos -- <id>` — rasmlar siqilib `public/cars/<id>/1.webp, 2.webp, ...` ga tushadi.
 
-Yangi obzor videosi: `REELS` ga reel ID sini qo'shing (`instagram.com/reel/<ID>/` dagi qism).
+## Obzor videosi qo'shish
+
+1. `src/data/stock.js` dagi `REELS` ga reel ID sini va sarlavhasini qo'shing (`instagram.com/reel/<ID>/` dagi qism).
+2. `npm run reels -- <ID>` — video Instagram'dan yuklanadi (`yt-dlp`), siqiladi (`ffmpeg`) va `public/reels/` ga tushadi:
+   `<ID>.mp4` (to'liq, ovozli, 540×960), `<ID>-preview.mp4` (12 soniyalik ovozsiz parcha) va `<ID>.webp` (muqova).
+
+Kerak: `winget install Gyan.FFmpeg yt-dlp.yt-dlp`. Instagram yuklashga ruxsat bermasa, videoni
+`HM_Group_mashinalar/obzorlar/<ID>.mp4` nomi bilan qo'lda qo'ying va buyruqni qayta ishga tushiring.
 
 ## 3D modellar
 
@@ -119,7 +127,7 @@ src/logo.js             — HM logotipi (SVG path)
 src/styles.css          — dizayn
 src/i18n.js             — UZ / RU matnlar
 src/data/cars.js        — 3D garaj mashinalari va "Sotildi"
-src/data/stock.js       — sotuvdagi mashinalar (rasmlar bilan) va obzor videolari
+src/data/stock.js       — sotuvdagi mashinalar (rasmlar bilan) va obzor videolari (public/reels)
 src/three/world.js      — renderer va post-effektlar (bloom, tone mapping), yuklash, hover / tanlash
 src/three/story.js      — skroll hikoyasi (kamera, konteyner, kran, kema)
 src/three/garage.js     — garaj sahnasi
@@ -131,7 +139,7 @@ src/three/sky.js        — osmon (quyosh, bulutlar) va undan muhit xaritasi
 src/three/textures.js   — protsedural teksturalar (bo'yoq, zang, beton, devor, darvoza)
 src/three/materials.js  — mashina bo'yoqlari
 src/three/wheels.js     — g'ildiraklarni ajratish (aylanish, rul, podveska)
-tools/                  — model va rasm optimizatsiyasi
+tools/                  — model, rasm va video optimizatsiyasi
 HM_Group_mashinalar/    — sotuvdagi mashinalarning asl rasmlari (saytga public/cars ichidagi siqilganlari ketadi)
 dev/                    — model ko'ruvchi, g'ildirak tekshiruvi va katalog renderi
 ```

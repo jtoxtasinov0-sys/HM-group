@@ -5,6 +5,8 @@ dist
 /*.glb
 # sotuvdagi mashinalarning asl rasmlari (~28 MB) — saytga public/cars ichidagi siqilganlari ketadi (npm run photos)
 /HM_Group_mashinalar/*/*.jpg
+# obzor videolarining asl nusxalari (~107 MB) — saytga public/reels ichidagi siqilganlari ketadi (npm run reels)
+/HM_Group_mashinalar/obzorlar/
 # ma'lumot uchun yuklangan rasmlar (saytda ishlatilmaydi)
 /*.jpg
 /This isn*

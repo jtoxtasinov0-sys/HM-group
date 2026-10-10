@@ -10,6 +10,7 @@
     "models": "node tools/optimize-models.mjs",
     "icons": "node tools/icons.mjs",
     "photos": "node tools/optimize-photos.mjs",
+    "reels": "node tools/optimize-reels.mjs",
     "deploy": "node tools/deploy.mjs",
     "deploy:github": "node tools/deploy-github.mjs"
   },
