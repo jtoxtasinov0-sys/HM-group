@@ -78,11 +78,12 @@ export function createStory(world) {
       const i0 = Math.floor(f), i1 = Math.min(ents.length - 1, i0 + 1), t = f - i0;
       const s0 = G.slots[i0], s1 = G.slots[i1];
       const sx = lerp(s0.x, s1.x, t), sz = lerp(s0.z, s1.z, t);
+      const h = world.heroTune;
       return {
-        pos: V(sx * 0.82, 3.1, sz + 13.5 / Math.max(0.6, a) * 0.62),
+        pos: V(sx * 0.82, h.mY, sz + 13.5 / Math.max(0.6, a) * 0.62 * h.mDist),
         tgt: V(sx, 1.0, sz),
         fov: 46,
-        shift: 0.16,
+        shift: h.mShift,
       };
     }
     const h = world.heroTune;
@@ -193,7 +194,7 @@ export function createStory(world) {
   const EXIT_LEN = G.stage.z - (G.container.z + 0.1);
 
   // joydan sahnaga: oldinga chiqib, bir tekis yoy bo'ylab burilib, sahnaga kiradi.
-  // Koeffitsientlar qo'shni mashinalarga tegmaslik uchun tanlangan (eng kichik burilish radiusi ~6.6 m)
+  // Koeffitsientlar qo'shni mashinalarga tegmaslik uchun tanlangan (joylar orasi 4 m — avval to'g'ri chiqadi)
   const pathCache = new Map();
   const pathFor = (i) => {
     if (pathCache.has(i)) return pathCache.get(i);
@@ -203,16 +204,23 @@ export function createStory(world) {
     const chord = Math.atan2(p3.x - p0.x, p3.z - p0.z);
     const endYaw = chord + (chord - s.yaw) * 1.1;
     const d = p0.distanceTo(p3);
-    const p1 = p0.clone().addScaledVector(dirOf(s.yaw), d * 0.66);
-    const p2 = p3.clone().addScaledVector(dirOf(endYaw), -d * 0.25);
+    const p1 = p0.clone().addScaledVector(dirOf(s.yaw), d * 0.8);
+    const p2 = p3.clone().addScaledVector(dirOf(endYaw), -d * 0.3);
     const path = makePath(p0, p1, p2, p3);
     pathCache.set(i, path);
     return path;
   };
-  /** Platformada aylanish: kelgan yo'nalishdan ko'rgazma burchagigacha + to'liq aylanish */
-  const showTurn = (from) => {
-    const r = ((STAGE_YAW - from) % TAU + TAU) % TAU;
-    return r < Math.PI ? r + TAU : r;
+  /**
+   * Platformada aylanish: mashina kelgan tomonga (dir) burilishda davom etadi — avval ko'rgazma burchagigacha,
+   * keyin konteyner tomonga. Jami ~1–1.3 marta aylanadi; juda qisqa bo'lsa bitta aylanish qo'shiladi.
+   */
+  const fwd = (a, dir) => dir * ((((a * dir) % TAU) + TAU) % TAU);
+  const stageTurns = (path, i) => {
+    const dir = Math.sign(wrapPi(path.endYaw - G.slots[i].yaw)) || 1;
+    let show = fwd(STAGE_YAW - path.endYaw, dir);
+    const fin = fwd(Math.PI - STAGE_YAW, dir);
+    if (Math.abs(show + fin) < 0.75 * TAU) show += dir * TAU;
+    return { show, fin };
   };
 
   // pol balandligi: platformalar va konteyner ostonasi (old va orqa g'ildiraklar alohida o'lchanadi)
@@ -239,8 +247,8 @@ export function createStory(world) {
     } else if (p < T.driveA) {
       // sahnada — platforma aylanadi (g'ildiraklar turadi)
       x = G.stage.x; z = G.stage.z;
-      yaw = path.endYaw + ease(seg(p, T.showA, T.showB)) * showTurn(path.endYaw);
-      yaw = lerpAngle(yaw, Math.PI, ease(seg(p, T.turnA, T.turnB)));
+      const { show, fin } = stageTurns(path, world.selected);
+      yaw = path.endYaw + ease(seg(p, T.showA, T.showB)) * show + ease(seg(p, T.turnA, T.turnB)) * fin;
     } else if (p < T.driveB) {
       x = 0; z = G.stage.z - profOut(seg(p, T.driveA, T.driveB)) * EXIT_LEN; yaw = Math.PI;
     } else {
@@ -373,15 +381,10 @@ export function createStory(world) {
         e.hover = damp(e.hover, target, target ? 6 : 4, dt);
         const h = ease(clamp01(e.hover));
 
-        // aylanish: hover bo'lsa aylanadi, aks holda eng yaqin to'liq aylanishga qaytadi
-        if (target) {
-          e.spinVel = damp(e.spinVel, 0.85, 3, dt);
-          e.spinAngle += e.spinVel * dt;
-        } else {
-          e.spinVel = damp(e.spinVel, 0, 5, dt);
-          const home = Math.round(e.spinAngle / TAU) * TAU;
-          e.spinAngle = damp(e.spinAngle + e.spinVel * dt, home, heroLive ? 1.6 : isSel ? 14 : 5, dt);
-        }
+        // hover: mashina tomoshabinga qarab burilib, sekin chayqaladi. To'liq aylanmaydi —
+        // qo'shnilar 4 m narida, aylansa ularga kirib ketadi (0..0.5 rad oralig'i xavfsiz)
+        const face = Math.sign(e.slot.yaw) * (0.12 + 0.1 * Math.sin(time * 0.7 + i)) - e.slot.yaw;
+        e.spinAngle = damp(e.spinAngle, target ? face : 0, target || heroLive ? 2.4 : isSel ? 14 : 5, dt);
         e.spin.rotation.y = e.spinAngle;
         e.lift.scale.setScalar(1 + 0.12 * h);
         e.lift.position.y = 0.05 * h;

@@ -14,25 +14,32 @@ export const G = {
   doorW: 5.4,
   doorH: 4.4,
   ceilY: 7.4,
-  halfW: 24,
-  frontZ: 28,
+  halfW: 30,
+  frontZ: 36,
   ellZ: 3.5,     // orqa ellips markazi (z)
   ellB: 12.5,    // ellipsning chuqurligi: ellZ - ellB = wallZ
   ttH: 0.035,    // platforma balandligi
   stage: new THREE.Vector3(0, 0, 3.6),
   stageR: 3.0,
   stageRing: 0.45,
-  slotR: 2.25,
-  slotRing: 0.3,
+  slotR: 1.74,
+  slotRing: 0.16,
   skyR: 6.2,     // sahna ustidagi yorug' doira
-  // chapdan o'ngga: 3 ta chapda, 3 ta o'ngda, o'rtada yo'lak
+  // chapdan o'ngga (cars.js → GARAGE tartibida): 6 ta chapda, 5 ta o'ngda, o'rtada yo'lak.
+  // Oraliq 4 m — yo'lga chiqqan mashina qo'shnisiga, devorga va sahnaga tegmaydi (eng chetdagisi devor
+  // egilgani uchun biroz oldinda). Joy qo'shilsa yoki surilsa, haydash yo'llarini qayta tekshiring.
   slots: [
-    { x: -15.0, z: -2.4, yaw: 0.62 },
-    { x: -9.9,  z: -1.8, yaw: 0.62 },
-    { x: -4.9,  z: -0.9, yaw: 0.62 },
-    { x: 4.9,   z: -0.9, yaw: -0.62 },
-    { x: 9.9,   z: -1.8, yaw: -0.62 },
-    { x: 15.0,  z: -2.4, yaw: -0.62 },
+    { x: -24.5, z: 0.8,  yaw: 0.5 },
+    { x: -20.5, z: -1.0, yaw: 0.5 },
+    { x: -16.5, z: -1.0, yaw: 0.5 },
+    { x: -12.5, z: -1.0, yaw: 0.5 },
+    { x: -8.5,  z: -1.0, yaw: 0.5 },
+    { x: -4.5,  z: -1.0, yaw: 0.5 },
+    { x: 4.5,   z: -1.0, yaw: -0.5 },
+    { x: 8.5,   z: -1.0, yaw: -0.5 },
+    { x: 12.5,  z: -1.0, yaw: -0.5 },
+    { x: 16.5,  z: -1.0, yaw: -0.5 },
+    { x: 20.5,  z: -1.0, yaw: -0.5 },
   ],
   container: new THREE.Vector3(0, 0, -16.35),
 };

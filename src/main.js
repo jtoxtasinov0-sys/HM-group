@@ -1,5 +1,5 @@
 import Lenis from 'lenis';
-import { CARS, SOLD, GARAGE, byId } from './data/cars.js';
+import { CARS, SOLD, GARAGE, GARAGE_START, byId } from './data/cars.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
 import { seg } from './three/story.js';
@@ -180,7 +180,8 @@ const rail = $('#rail');
 const railItems = $$('#rail li');
 const railFill = $('#railFill');
 const daysNum = $('#daysNum');
-let lastDays = -1;
+const DAYS = [40, 45]; // Koreyadan O'zbekistonga yetkazish muddati (kun)
+let lastDays = '';
 
 function updateLayers(p) {
   setLayer('hero', 1 - seg(p, 0.002, 0.016));
@@ -189,13 +190,14 @@ function updateLayers(p) {
   const idx = p < 0.27 ? 0 : p < 0.53 ? 1 : p < 0.79 ? 2 : 3;
   railItems.forEach((li, i) => li.classList.toggle('is-active', i <= idx));
   rail.classList.toggle('is-hidden', p < 0.01);
-  const days = Math.round(25 * seg(p, 0.815, 0.9));
-  if (days !== lastDays) { lastDays = days; daysNum.textContent = String(days); }
+  const k = seg(p, 0.815, 0.9);
+  const days = `${Math.round(DAYS[0] * k)}–${Math.round(DAYS[1] * k)}`;
+  if (days !== lastDays) { lastDays = days; daysNum.textContent = days; }
 }
 
 // ---------------- Tanlangan mashina ma'lumotlari ----------------
 let world = null;
-let selected = GARAGE[2];
+let selected = GARAGE[GARAGE_START];
 
 function updateShowcase() {
   const c = selected;
@@ -275,7 +277,7 @@ async function boot() {
     await document.fonts.load('600 100px Inter').catch(() => {});
     const manifest = await fetch(`${BASE}models/manifest.json`).then((r) => r.json());
     const quality = detectQuality();
-    world = new World($('#webgl'), { cars: CARS, manifest, quality, onProgress: setLoad });
+    world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest, quality, onProgress: setLoad });
     await world.init();
     world.targetP = DEBUG_P !== null ? parseFloat(DEBUG_P) : progressAt(lenis.scroll || scrollY);
     world.p = world.targetP;

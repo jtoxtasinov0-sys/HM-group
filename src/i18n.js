@@ -12,8 +12,8 @@ export const DICT = {
     'loader.text': 'Garaj tayyorlanmoqda',
 
     'hero.eyebrow': 'Janubiy Koreya → O\'zbekiston va dunyo',
-    'hero.title': 'Biz — Koreyada.<br><em>Hamkorlarimiz — butun dunyoda</em>',
-    'hero.text': 'Koreyadan avtomobillarni tanlaymiz, xarid qilamiz va konteynerda kema orqali yetkazamiz — taxminan 25 kunda.',
+    'hero.title': 'Koreyadan avtomobil yetkazish —<br><em>100% xavfsiz va rasmiy!</em>',
+    'hero.text': 'To\'liq diagnostika hisoboti va shartnoma asosida.',
     'hero.cta': 'Mashina tanlash',
     'hero.cta2': 'Telegram kanal',
     'hero.hint': 'Mashinaga sichqonchani olib boring — bosib tanlang',
@@ -48,7 +48,7 @@ export const DICT = {
     'ch2.b3': 'Doimiy aloqa',
 
     'ch3.num': '03 — Yetkazish',
-    'ch3.title': 'Taxminan 25 kunda — sizda',
+    'ch3.title': '40–45 kunda — sizda',
     'ch3.text': 'Koreyadan O\'zbekistonga va boshqa davlatlarga. Mashinangiz yo\'lda ekan, biz doim aloqadamiz.',
     'ch3.cta': 'Buyurtma berish',
     'ch3.days': 'kun yo\'lda',
@@ -102,8 +102,8 @@ export const DICT = {
     'log.3t': 'Kema',
     'log.3': 'Konteynerga joylab, kema orqali jo\'natamiz.',
     'log.4t': 'Yetkazish',
-    'log.4': 'Taxminan 25 kunda mashina sizda.',
-    'log.days': '~25 kun',
+    'log.4': '40–45 kunda mashina sizda.',
+    'log.days': '40–45 kun',
 
     'contact.eyebrow': 'Kontakt',
     'contact.title': 'Mashinangizni birga tanlaymiz',
@@ -130,8 +130,8 @@ export const DICT = {
     'loader.text': 'Готовим гараж',
 
     'hero.eyebrow': 'Южная Корея → Узбекистан и весь мир',
-    'hero.title': 'Мы — в Корее.<br><em>Наши партнёры — по всему миру</em>',
-    'hero.text': 'Подбираем, покупаем и доставляем автомобили из Кореи в контейнере морем — примерно за 25 дней.',
+    'hero.title': 'Доставка автомобилей из Кореи —<br><em>100% безопасно и официально!</em>',
+    'hero.text': 'С полным отчётом о диагностике и по договору.',
     'hero.cta': 'Выбрать авто',
     'hero.cta2': 'Telegram канал',
     'hero.hint': 'Наведите на автомобиль — нажмите, чтобы выбрать',
@@ -166,7 +166,7 @@ export const DICT = {
     'ch2.b3': 'Всегда на связи',
 
     'ch3.num': '03 — Доставка',
-    'ch3.title': 'Примерно 25 дней — и авто у вас',
+    'ch3.title': '40–45 дней — и авто у вас',
     'ch3.text': 'Из Кореи в Узбекистан и другие страны. Пока автомобиль в пути, мы всегда на связи.',
     'ch3.cta': 'Оформить заказ',
     'ch3.days': 'дней в пути',
@@ -220,8 +220,8 @@ export const DICT = {
     'log.3t': 'Судно',
     'log.3': 'Загружаем в контейнер и отправляем морем.',
     'log.4t': 'Доставка',
-    'log.4': 'Примерно через 25 дней автомобиль у вас.',
-    'log.days': '~25 дней',
+    'log.4': 'Через 40–45 дней автомобиль у вас.',
+    'log.days': '40–45 дней',
 
     'contact.eyebrow': 'Контакты',
     'contact.title': 'Подберём автомобиль вместе',

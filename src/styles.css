@@ -389,7 +389,7 @@ h1, h2, h3, p { margin: 0; }
   .nav__word { display: none; }
   .nav__cta { display: none; }
   .hero { padding-top: 96px; padding-bottom: 26px; }
-  .hero__text { display: none; }
+  .hero__text { font-size: 14px; line-height: 1.5; }
   .hero__btns .btn { --h: 46px; padding: 0 20px; font-size: 14px; }
   .hero__btns .btn--navy-ghost { display: none; }
   .showcase__price { letter-spacing: .06em; }
