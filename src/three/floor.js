@@ -17,7 +17,7 @@ export function createGlossyFloor({ width, depth, color, map, roughnessMap, repe
   if (!reflect) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.rotation.x = -Math.PI / 2;
-    return { mesh, setSize() {}, uniforms: null };
+    return { mesh, setSize() {}, setReflect() {}, uniforms: null };
   }
 
   const w = Math.round(window.innerWidth * resolution);
@@ -66,10 +66,16 @@ export function createGlossyFloor({ width, depth, color, map, roughnessMap, repe
   };
   mesh.material = mat;
   mesh.rotation.x = -Math.PI / 2;
+  const renderReflection = mesh.onBeforeRender;
 
   return {
     mesh,
     uniforms,
+    /** Kuchsiz GPU'da aks o'chiriladi: sahna kadrda bir marta kam chiziladi */
+    setReflect(on) {
+      mesh.onBeforeRender = on ? renderReflection : () => {};
+      uniforms.uReflStrength.value = on ? strength : 0;
+    },
     setSize(width2, height2) {
       const rw = Math.round(width2 * resolution), rh = Math.round(height2 * resolution);
       rt.setSize(rw, rh);

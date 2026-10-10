@@ -1,4 +1,4 @@
-// HM Group — 3D garaj, «Sotildi» va «Mijozlar» bo'limlari uchun mashinalar (3D model bilan).
+// HM Group — 3D garaj va «Mijozlar» bo'limi uchun mashinalar (3D model bilan).
 // DIQQAT: bu NAMUNA ma'lumotlar. Saytdagi «Sotuvda» katalogi — src/data/stock.js (haqiqiy mashinalar).
 //
 // paint      — garajdagi 3D model rangi (src/three/materials.js → PAINTS)
@@ -10,15 +10,6 @@
 // hideRe     — ixtiyoriy: shu materialdagi qismlar yashiriladi (regex)
 
 export const CARS = [
-  {
-    id: 'staria', brand: 'Hyundai', model: 'Staria Hybrid', outline: 'STARIA',
-    year: 2025, hp: 245, seats: 7, km: 0, type: 'van',
-    engine: { uz: '1.6 T-GDi Gibrid', ru: '1.6 T-GDi Гибрид' },
-    color: { uz: 'Qora', ru: 'Чёрный' },
-    note: { uz: 'Lounge komplektatsiya, panorama tom', ru: 'Комплектация Lounge, панорамная крыша' },
-    // modeldagi material nomlari aralashgan: kuzov — "CalipersPart"
-    paint: 'obsidian', paintRe: /Premium_CalipersPart$/,
-  },
   {
     id: 'ev9', brand: 'Kia', model: 'EV9 GT-Line', outline: 'EV9',
     year: 2024, hp: 385, seats: 6, km: 0, type: 'ev',
@@ -101,10 +92,16 @@ export const CARS = [
     note: { uz: 'Signature komplektatsiya', ru: 'Комплектация Signature' },
     paint: 'silver', paintRe: /Wolf_Gray/,
   },
+  {
+    // o'sha Sportage modeli, qora rangda (Staria o'rniga)
+    id: 'sportageb', file: 'sportage', brand: 'Kia', model: 'Sportage Hybrid', outline: 'SPORTAGE',
+    year: 2024, hp: 230, seats: 5, km: 0, type: 'suv',
+    engine: { uz: '1.6 T-GDi Gibrid', ru: '1.6 T-GDi Гибрид' },
+    color: { uz: 'Qora', ru: 'Чёрный' },
+    note: { uz: 'Signature komplektatsiya', ru: 'Комплектация Signature' },
+    paint: 'obsidian', paintRe: /Wolf_Gray/,
+  },
 ];
-
-// "Sotildi" bo'limi — namunaviy. Haqiqiy sotilgan mashinalar bilan almashtiring.
-export const SOLD = ['ghost', 'g63', 'escalade', 'staria', 'x6', 'maybach'];
 
 export const byId = (id) => CARS.find((c) => c.id === id);
 
@@ -112,7 +109,7 @@ export const byId = (id) => CARS.find((c) => c.id === id);
 // Markazdagilari birinchi yuklanadi, chetdagilari sayt ochilgandan keyin qo'shiladi.
 export const GARAGE = [
   'ev9', 'sportage', 'escalade', 'maybach', 'g63w', 'g63',
-  'urus', 'staria', 'ghost', 'rrsport', 'x6',
+  'urus', 'sportageb', 'ghost', 'rrsport', 'x6',
 ].map(byId);
 // sayt ochilganda tanlangan mashina
 export const GARAGE_START = GARAGE.findIndex((c) => c.id === 'g63');

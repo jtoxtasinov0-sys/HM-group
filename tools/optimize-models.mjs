@@ -11,6 +11,7 @@ import draco3d from 'draco3dgltf';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -155,7 +156,9 @@ for (const cfg of list) {
   const out = path.join(OUT_DIR, `${cfg.id}.glb`);
   await io.write(out, doc);
   const after = countTris(doc);
-  manifest[cfg.id] = { box, tris: after, bytes: fs.statSync(out).size };
+  // v — fayl mazmuni xeshi: sayt modelni ?v=... bilan so'raydi, shuning uchun brauzer keshi uzoq saqlay oladi
+  const v = crypto.createHash('sha256').update(fs.readFileSync(out)).digest('hex').slice(0, 10);
+  manifest[cfg.id] = { box, tris: after, bytes: fs.statSync(out).size, v };
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
   const size = (fs.statSync(out).size / 1e6).toFixed(2);
   console.log(`${cfg.id.padEnd(9)} ${String(before).padStart(8)} -> ${String(after).padStart(7)} tris | ${size} MB | scale ${s.toFixed(4)} ${alongX ? '(rotated)' : ''} | ${((Date.now() - t0) / 1000).toFixed(1)}s`);

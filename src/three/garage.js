@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createGlossyFloor } from './floor.js';
 import { createSky } from './sky.js';
 import {
-  makeWallLogoTexture, makeTurntableTexture, makeRubberTexture, makePolishedFloorTextures, makePlasterWallTexture,
+  makeTurntableTexture, makeRubberTexture, makePolishedFloorTextures, makePlasterWallTexture,
   makeScallopTexture, makeShutterTextures, makeConcreteTextures, makeStackTextures, makeGrimeTexture, rand,
 } from './textures.js';
 
@@ -233,20 +233,13 @@ export function createGarage({ quality }) {
   }
   for (const s of [-1, 1]) for (const [x, z] of [[12, -5], [12.5, 2], [17, -2], [18, 6], [10, 10], [16, 14], [8, 18], [16, 22]]) fixture(s * x, z);
 
-  // ---------- ESHIK (alyumin roll-darvoza) va LOGO ----------
+  // ---------- ESHIK (alyumin roll-darvoza) ----------
   const backZ = G.ellZ - G.ellB; // = wallZ
   const frameD = 0.26, frameW = 0.16;
   const fbox = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), metalMat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; group.add(m); return m; };
   for (const s of [-1, 1]) fbox(frameW, G.doorH + frameW, frameD, s * (G.doorW / 2 + frameW / 2), (G.doorH + frameW) / 2, backZ + 0.03);
   fbox(G.doorW + frameW * 2, frameW + 0.06, frameD + 0.04, 0, G.doorH + (frameW + 0.06) / 2, backZ + 0.05); // tepadagi quti
   fbox(G.doorW, 0.012, 0.22, 0, 0.006, backZ + 0.02);                                                      // ostona
-
-  const logo = new THREE.Mesh(
-    new THREE.PlaneGeometry(4.4, 2.2),
-    new THREE.MeshBasicMaterial({ map: makeWallLogoTexture(), color: new THREE.Color('#1D3E69'), transparent: true, depthWrite: false, toneMapped: false }),
-  );
-  logo.position.set(0, G.doorH + (G.ceilY - G.doorH) / 2 + 0.05, backZ + 0.12);
-  group.add(logo);
 
   const sh = makeShutterTextures();
   const shutterMaps = [sh.map, sh.normalMap, sh.roughnessMap];
@@ -306,16 +299,6 @@ export function createGarage({ quality }) {
   anim.turntables = G.slots.map((s) => makeTurntable(G.slotR, G.slotRing, s.x, s.z));
   anim.stage = makeTurntable(G.stageR, G.stageRing, G.stage.x, G.stage.z);
 
-  // sahna markazidagi "HM" belgisi (bo'sh turganda ko'rinadi)
-  const stageLogo = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.0, 1.5),
-    new THREE.MeshBasicMaterial({ map: makeWallLogoTexture(), color: new THREE.Color('#1D3E69'), transparent: true, depthWrite: false, opacity: 0.55, toneMapped: false }),
-  );
-  stageLogo.rotation.x = -Math.PI / 2;
-  stageLogo.position.set(G.stage.x, G.ttH + 0.003, G.stage.z + 0.2);
-  group.add(stageLogo);
-  anim.stageLogo = stageLogo;
-
   // ---------- HOVLI (eshik orqasi, konteyner turadigan joy) — kunduzgi ----------
   const yard = createYard(quality);
   group.add(yard.group);
@@ -340,6 +323,10 @@ export function createGarage({ quality }) {
     skySpot.shadow.normalBias = 0.02;
     skySpot.shadow.camera.near = 1;
     skySpot.shadow.camera.far = 16;
+    // soya xaritasi faqat sahnada nimadir qimirlaganda qayta chiziladi (world.js → shadowDirty):
+    // garaj jim turganda har kadrda butun sahnani yana bir marta chizish shart emas
+    skySpot.shadow.autoUpdate = false;
+    skySpot.shadow.needsUpdate = true;
   }
   group.add(skySpot, skySpot.target);
 
@@ -367,7 +354,8 @@ export function createGarage({ quality }) {
     sun.shadow.autoUpdate = k > 0.001;
   };
   // GPU konteksti tiklanganda soya xaritasi qayta chiziladi
-  anim.refreshShadows = () => { sun.shadow.needsUpdate = true; };
+  anim.refreshShadows = () => { sun.shadow.needsUpdate = true; skySpot.shadow.needsUpdate = true; };
+  anim.spotShadowDirty = () => { skySpot.shadow.needsUpdate = true; };
 
   const skyBase = skyMat.color.clone();
   const dlBase = dlMat.color.clone();

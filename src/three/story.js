@@ -94,14 +94,17 @@ export function createStory(world) {
     return { pos: V(m.x * h.pan, h.y + m.y * 0.25, D), tgt: V(m.x * h.pan * 0.8, h.ty, -1.5), fov: h.fov, shift: h.shift };
   };
   const pr = () => world.portrait;
+  // Telefonda (portret) ekran tor — kompyuterdagi kadrlarda mashina va konteyner chetlardan kesilib, kamera
+  // "yopishib" qolardi. Garajda (ochiq joy) kamera uzoqroq turadi; eshik va hovlida yo'li devorga tegmasligi uchun
+  // joyi o'sha, lekin obyektiv kengroq (fov) va kadr biroz tepaga (shift < 0) — pastdagi panel mashinani yopmasin
   const KF = [
     { p: 0, cam: heroCam },
-    { p: T.moveB, cam: () => ({ pos: pr() ? V(4.2, 2.6, 16.5) : V(4.7, 1.95, 12.6), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
-    { p: T.showB, cam: () => ({ pos: pr() ? V(-4.4, 2.8, 16.2) : V(-4.9, 2.2, 12.0), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
-    { p: T.driveA, cam: () => ({ pos: V(2.4, 2.9, 11.2), tgt: V(0, 1.3, -8), fov: pr() ? 52 : 34 }) },
-    { p: 0.36, cam: () => ({ pos: V(1.6, 2.6, 5.0), tgt: V(0, 1.2, -12), fov: pr() ? 52 : 36 }) },
-    { p: T.driveB, cam: () => ({ pos: V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 56 : 38 }) },
-    { p: T.closeB, cam: () => ({ pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: pr() ? 56 : 38 }) },
+    { p: T.moveB, cam: () => ({ pos: pr() ? V(3.4, 3.2, 19.6) : V(4.7, 1.95, 12.6), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
+    { p: T.showB, cam: () => ({ pos: pr() ? V(-3.6, 3.3, 19.4) : V(-4.9, 2.2, 12.0), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
+    { p: T.driveA, cam: () => ({ pos: pr() ? V(2.2, 3.6, 16.0) : V(2.4, 2.9, 11.2), tgt: V(0, 1.3, -8), fov: pr() ? 54 : 34, shift: pr() ? -0.06 : 0 }) },
+    { p: 0.36, cam: () => ({ pos: pr() ? V(0.9, 2.8, 5.8) : V(1.6, 2.6, 5.0), tgt: V(0, 1.2, -12), fov: pr() ? 68 : 36, shift: pr() ? -0.14 : 0 }) },
+    { p: T.driveB, cam: () => ({ pos: V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 66 : 38, shift: pr() ? -0.1 : 0 }) },
+    { p: T.closeB, cam: () => ({ pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: pr() ? 70 : 38, shift: pr() ? -0.1 : 0 }) },
     { p: T.spreadB, cam: () => ({ pos: V(8.5, 3.6, -11.2), tgt: V(0, 2.0, G.container.z), fov: pr() ? 58 : 38 }) },
     // ko'tarilish — kamera konteyner bilan birga, kran portali ichida (oyoqlar va to'sinlardan uzoqda):
     // eshiklar va yon tomon ko'rinadi, orqada port steklari
@@ -364,8 +367,7 @@ export function createStory(world) {
       world.outline.material.opacity = show * 0.85;
       world.outline.visible = show > 0.001;
 
-      // sahna logosi va chiroqlar
-      A.stageLogo.material.opacity = 0.55 * (1 - seg(p, 0.03, 0.08));
+      // sahna chiroqlari
       const stageOn = seg(p, 0.05, 0.11) * (1 - seg(p, T.driveA, T.driveA + 0.05));
       A.stageSpot.intensity = 55 * stageOn;
       A.stage.rimMat.color.copy(A.stage.base).multiplyScalar(1 + 2.2 * stageOn);
@@ -385,11 +387,14 @@ export function createStory(world) {
         // qo'shnilar 4 m narida, aylansa ularga kirib ketadi (0..0.5 rad oralig'i xavfsiz)
         const face = Math.sign(e.slot.yaw) * (0.12 + 0.1 * Math.sin(time * 0.7 + i)) - e.slot.yaw;
         e.spinAngle = damp(e.spinAngle, target ? face : 0, target || heroLive ? 2.4 : isSel ? 14 : 5, dt);
-        e.spin.rotation.y = e.spinAngle;
-        e.lift.scale.setScalar(1 + 0.12 * h);
+        // fonda yuklangan mashina paydo bo'ladi: platformada kichik burilish bilan o'sib chiqadi, halqa yonadi
+        if (e.appear < 1) e.appear = Math.min(1, e.appear + dt / 0.9);
+        const ap = 1 - Math.pow(1 - e.appear, 3);
+        e.spin.rotation.y = e.spinAngle + 0.8 * (1 - ap);
+        e.lift.scale.setScalar((1 + 0.12 * h) * (0.86 + 0.14 * ap));
         e.lift.position.y = 0.05 * h;
         e.turntable.group.rotation.y = e.slot.yaw + e.spinAngle;
-        e.turntable.rimMat.color.copy(e.turntable.base).multiplyScalar(1 + 3.2 * h - (isSel ? 0 : 0.6 * selDim));
+        e.turntable.rimMat.color.copy(e.turntable.base).multiplyScalar(1 + 3.2 * h + 2.4 * (1 - ap) - (isSel ? 0 : 0.6 * selDim));
 
         if (isSel && p > T.heroEnd) placeSelected(e, p, dt);
         else parkAtSlot(e);
@@ -426,6 +431,16 @@ export function createStory(world) {
 
     // --- kamera ---
     const fov = sampleCam(p);
+    // kirish (sayt ochilganda): kamera chetdan, yuqoridan va uzoqdan garajga kirib keladi.
+    // expo.out — tez boshlanib, uzoq va yumshoq to'xtaydi; garaj devori va shiftidan chiqib ketmaydi
+    if (world.intro > 0) {
+      const u = 1 - world.intro;
+      const k = Math.pow(2, -10 * u) * (1 - u);
+      camPos.x = THREE.MathUtils.clamp(camPos.x - 7 * k, 3 - G.halfW, G.halfW - 3);
+      camPos.y = Math.min(G.ceilY - 1.1, camPos.y + 3.4 * k);
+      camPos.z = Math.min(G.frontZ - 1.5, camPos.z + 8 * k);
+      camTgt.y -= 0.5 * k;
+    }
     if (Math.abs(fov - curFov) > 0.01 || Math.abs(curShift - appliedShift) > 1e-4 || world.projDirty) {
       curFov = fov; camera.fov = fov; camera.updateProjectionMatrix();
       // lens shift: rasmni vertikal siljitadi (perspektiva buzilmaydi)
