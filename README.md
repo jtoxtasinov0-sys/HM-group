@@ -97,9 +97,22 @@ Asl `.glb` fayllar juda og'ir edi (jami ~1 GB). Ular siqildi va `public/models/`
 geometriya soddalashtirildi, meshopt bilan siqildi, teksturalar WebP ga o'tkazildi
 (masalan, Maybach: 81 MB → 3.4 MB).
 
-Garajdagi barcha mashinalar va kema saytda yuklanadi (~42 MB). Sayt markazdagi 6 ta mashina
-(~16 MB) yuklangach ochiladi, chetdagilari va kema keyin, fonda qo'shiladi. Bir model bir necha
+Garajdagi barcha mashinalar va kema saytda yuklanadi (~42 MB). Sayt tez ochilishi uchun faqat birinchi
+kadrda kerakli modellar kutiladi: kompyuterda markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB), telefonda —
+tanlangan mashina (G 63, ~3.4 MB). Qolganlari markazdan chetga tartibda, bir vaqtda 2 tadan fonda
+yuklanadi va platformada silliq paydo bo'ladi; kema oxirida (foydalanuvchi skrollni boshlasa — oldinroq).
+Sichqoncha borgan / tanlangan mashina navbatda oldinga o'tadi. Bir model bir necha
 rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`).
+
+Tezlik uchun (qotmasligi uchun):
+
+- fondagi og'ir ishlar (model tayyorlash, shaderlar, teksturalarni GPU'ga yuklash) brauzer bo'sh paytlariga
+  bo'lib qo'yiladi; port sahnasi (kran, kema, okean) hikoyaga yetib kelguncha oldindan tayyorlanadi;
+- meshopt geometriyasi alohida oqimlarda (Web Worker) ochiladi;
+- garajdagi soya xaritasi faqat biror narsa qimirlaganda qayta chiziladi;
+- kuchsiz GPU'da sifat avtomatik pasayadi (MSAA → piksel zichligi → pol aksi);
+- `manifest.json` dagi `v` — model fayli xeshi: model `?v=...` bilan so'raladi va brauzer keshida
+  uzoq saqlanadi (`vercel.json` → `headers`). Model o'zgarsa `npm run models` xeshni o'zi yangilaydi.
 
 Yangi model qo'shish:
 

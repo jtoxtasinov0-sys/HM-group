@@ -10,10 +10,18 @@ export const BRAND = {
 
 export const FONT = 'Inter, "Segoe UI", Arial, sans-serif';
 
+// willReadFrequently — canvas protsessor xotirasida chiziladi: getImageData GPU navbatini kutmaydi.
+// Aks holda WebGL band paytida (sahna chizilayotganda) bitta getImageData sahifani soniyalab qotirardi.
 function canvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  return [c, c.getContext('2d')];
+  return [c, c.getContext('2d', { willReadFrequently: true })];
+}
+
+/** Bir xil natija beradigan tekstura bir marta yasaladi (har chaqiruvda qayta chizilib, GPU'ga qayta yuklanmasin) */
+function once(fn) {
+  let v;
+  return () => (v ??= fn());
 }
 
 function tex(c, { srgb = true, repeat = false, aniso = 8 } = {}) {
@@ -53,13 +61,13 @@ function drawGroupWord(ctx, cx, y, width, size, color) {
 }
 
 /** Devordagi yorug' logo: HM belgisi + GROUP yozuvi */
-export function makeWallLogoTexture() {
+export const makeWallLogoTexture = once(() => {
   const [c, ctx] = canvas(2048, 1024);
   ctx.clearRect(0, 0, 2048, 1024);
   drawHM(ctx, 1024, 430, 1000, '#fff');
   drawGroupWord(ctx, 1024, 800, 1000, 120, '#fff');
   return tex(c);
-}
+});
 
 /** Mashina orqasidagi katta konturli nom (Taycan uslubida) */
 export function makeOutlineTextTexture(text) {
@@ -499,7 +507,7 @@ export function makeConcreteTextures({ seed = 31, tone = 150 } = {}) {
  * Port steklaridagi 40 futlik konteyner yon tomoni: oq asos (rang instansiyadan), qovurg'alar
  * normal xaritada, iflos va zang rangli xaritada.
  */
-export function makeStackTextures() {
+export const makeStackTextures = once(() => {
   const w = 1024, h = 256;
   const ribs = 44;
   const ridges = [];
@@ -516,7 +524,7 @@ export function makeStackTextures() {
   // ustki va pastki relslar
   hctx.fillStyle = '#fff'; hctx.fillRect(0, 0, w, 10); hctx.fillRect(0, h - 14, w, 14);
   return { map, roughnessMap, normalMap: tex(heightToNormal(hc, 4, { wrap: false }), { srgb: false }) };
-}
+});
 
 /**
  * Sayqallangan beton pol (showroom): choksiz, bulutsimon nozik dog'lar, mayda toshchalar,

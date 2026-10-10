@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { GARAGE, GARAGE_START } from './src/data/cars.js';
 
 // Dev-only: renderlarni (katalog rasmlari) diskka saqlash uchun endpoint
 const saveRenders = {
@@ -22,6 +23,24 @@ const saveRenders = {
   },
 };
 
+// Birinchi ko'rinadigan mashina modeli JS bilan bir vaqtda yuklana boshlaydi (preload) — sayt tezroq ochiladi
+let base = '/';
+const preloadHero = {
+  name: 'preload-hero',
+  configResolved(config) { base = config.base; },
+  transformIndexHtml() {
+    const manifest = JSON.parse(fs.readFileSync(path.resolve('public/models/manifest.json'), 'utf8'));
+    const car = GARAGE[GARAGE_START];
+    const file = car.file || car.id;
+    const v = manifest[file]?.v;
+    return [{
+      tag: 'link',
+      attrs: { rel: 'preload', href: `${base}models/${file}.glb${v ? `?v=${v}` : ''}`, as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'high' },
+      injectTo: 'head',
+    }];
+  },
+};
+
 // Saytning asosiy manzili: ijtimoiy tarmoqlar preview rasmni (og:image) faqat to'liq manzil bilan oladi
 const SITE_URL = (process.env.SITE_URL || 'https://hmgroup-uz.vercel.app').replace(/\/$/, '');
 const socialMeta = {
@@ -39,5 +58,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1500,
   },
-  plugins: [saveRenders, socialMeta],
+  plugins: [saveRenders, socialMeta, preloadHero],
 });

@@ -543,3 +543,10 @@ html.has-player { overflow: hidden; scrollbar-gutter: stable; }
 .no-webgl .story { height: 100vh; height: 100svh; }
 .no-webgl .story__sticky { background: radial-gradient(120% 90% at 70% 30%, #ffffff 0%, var(--light) 50%, #dde4ee 100%); }
 .no-webgl .webgl, .no-webgl .hint, .no-webgl .mobile-nav, .no-webgl .counter, .no-webgl .rail { display: none; }
+
+/* Telefon: katta panellar ostidagi 3D kadrni har kadrda xiralashtirish (backdrop-filter) GPU'ni band qilib,
+   skrollni sekinlashtiradi — o'rniga zichroq fon */
+@media (pointer: coarse) {
+  .showcase, .chapter { backdrop-filter: none; background: linear-gradient(180deg, rgba(14, 32, 60, 0.84), rgba(10, 24, 46, 0.92)); }
+  .round { backdrop-filter: none; background: rgba(255, 255, 255, 0.86); }
+}

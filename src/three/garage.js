@@ -340,6 +340,10 @@ export function createGarage({ quality }) {
     skySpot.shadow.normalBias = 0.02;
     skySpot.shadow.camera.near = 1;
     skySpot.shadow.camera.far = 16;
+    // soya xaritasi faqat sahnada nimadir qimirlaganda qayta chiziladi (world.js → shadowDirty):
+    // garaj jim turganda har kadrda butun sahnani yana bir marta chizish shart emas
+    skySpot.shadow.autoUpdate = false;
+    skySpot.shadow.needsUpdate = true;
   }
   group.add(skySpot, skySpot.target);
 
@@ -367,7 +371,8 @@ export function createGarage({ quality }) {
     sun.shadow.autoUpdate = k > 0.001;
   };
   // GPU konteksti tiklanganda soya xaritasi qayta chiziladi
-  anim.refreshShadows = () => { sun.shadow.needsUpdate = true; };
+  anim.refreshShadows = () => { sun.shadow.needsUpdate = true; skySpot.shadow.needsUpdate = true; };
+  anim.spotShadowDirty = () => { skySpot.shadow.needsUpdate = true; };
 
   const skyBase = skyMat.color.clone();
   const dlBase = dlMat.color.clone();
