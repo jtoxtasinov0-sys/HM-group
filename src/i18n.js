@@ -74,8 +74,12 @@ export const DICT = {
 
     'reels.eyebrow': 'Instagram Reels',
     'reels.title': 'Video obzorlar',
-    'reels.text': 'Mashinalarimiz videoda. Videoni bosing — Instagram\'da ochiladi.',
+    'reels.text': 'Mashinalarimiz videoda. Videoni bosing — shu yerning o\'zida ovozi bilan ko\'rasiz.',
+    'reels.watch': 'Ovozi bilan ko\'rish',
     'reels.open': 'Instagram\'da ochish',
+    'reels.close': 'Yopish',
+    'reels.prev': 'Oldingi video',
+    'reels.next': 'Keyingi video',
     'reels.more': 'Barcha obzorlar — Instagram\'da',
 
     'sold.eyebrow': 'Portfolio',
@@ -203,8 +207,12 @@ export const DICT = {
 
     'reels.eyebrow': 'Instagram Reels',
     'reels.title': 'Видеообзоры',
-    'reels.text': 'Наши автомобили на видео. Нажмите на видео — оно откроется в Instagram.',
+    'reels.text': 'Наши автомобили на видео. Нажмите на видео — смотрите прямо здесь, со звуком.',
+    'reels.watch': 'Смотреть со звуком',
     'reels.open': 'Открыть в Instagram',
+    'reels.close': 'Закрыть',
+    'reels.prev': 'Предыдущее видео',
+    'reels.next': 'Следующее видео',
     'reels.more': 'Все обзоры — в Instagram',
 
     'sold.eyebrow': 'Портфолио',

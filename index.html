@@ -381,6 +381,20 @@
     <div class="wrap footer__bottom"><span data-i18n="footer.rights"></span></div>
   </footer>
 
+  <!-- Obzor videosi: kartochka bosilganda shu oynada ovozi bilan o'ynaydi (src/main.js → openPlayer) -->
+  <dialog class="player" id="player" data-lenis-prevent>
+    <div class="player__stage">
+      <video class="player__video" controls playsinline preload="none"></video>
+      <div class="player__bar">
+        <strong class="player__title"></strong>
+        <a class="player__ig" target="_blank" rel="noopener"></a>
+      </div>
+    </div>
+    <button type="button" class="player__close" data-close autofocus>×</button>
+    <button type="button" class="player__nav player__nav--prev" data-dir="-1">‹</button>
+    <button type="button" class="player__nav player__nav--next" data-dir="1">›</button>
+  </dialog>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
