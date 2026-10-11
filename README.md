@@ -19,8 +19,9 @@ Skroll orqali hikoya qiluvchi premium sayt:
 5. **Yetkazish**: kema quyosh tomon suzib ketadi — "40–45 kun".
 
 Hikoya oxirida brendlar lentasi (Mercedes-Benz, Porsche, BMW...) 3D sahna ustiga "parda" bo'lib ko'tariladi,
-sahna esa kichrayib orqaga ketadi. Undan keyin oddiy bo'limlar: Sotuvda, Obzorlar, Mijozlar, Biz haqimizda,
-Logistika, Kontakt.
+sahna esa kichrayib orqaga ketadi. Undan keyin oddiy bo'limlar: Sotuvda, Obzorlar, Logistika, Biz haqimizda, Kontakt
+(to'q ko'k va och bo'limlar navbatma-navbat). «Mijozlar fikri» bo'limi hozircha olib tashlangan — keyin
+qaytariladi (git tarixida bor).
 
 - **Sotuvda** — haqiqiy mashinalar (Instagram e'lonlaridan): har birida 4 ta rasm (surib ko'riladi), ma'lumotlar,
   «Instagram» (postga) va «Ma'lumot olish» tugmalari. Filtr: SUV / Sedan / Sport.
@@ -85,7 +86,9 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |
 
 **Muhim:** `src/data/cars.js` dagi 3D garaj mashinalarining ma'lumotlari **namuna** (haqiqiy katalog — `stock.js`).
-"Mijozlar" bo'limidagi kartochkalar Instagram'ga olib boradi — xohlasangiz haqiqiy videolarni qo'shing.
+
+O'zbekcha matnlarda rasmiy imlo: `oʻ`, `gʻ` (U+02BB) va tutuq belgisi `ʼ` (U+02BC), masalan «Bogʻlanish»,
+«Maʼlumot olish». Oddiy apostrof (') ishlatmang. Katta raqamlardagi tire: `40<i class="dash">–</i>45`.
 
 ## Sotuvdagi mashina qo'shish
 
@@ -120,15 +123,19 @@ rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`
 Tezlik uchun (qotmasligi uchun):
 
 - fondagi og'ir ishlar (model tayyorlash, shaderlar, teksturalarni GPU'ga yuklash) brauzer bo'sh paytlariga
-  bo'lib qo'yiladi; port sahnasi (kran, kema, okean) hikoyaga yetib kelguncha oldindan tayyorlanadi;
+  bo'lib qo'yiladi va kirish animatsiyasi tugaguncha kutib turadi; port sahnasi (kran, kema, okean) skroll
+  to'xtagan paytda, hikoyaga yetib kelguncha oldindan tayyorlanadi;
+- g'ildiraklarni ajratish (`wheels.js`) fonda bo'laklarga bo'linadi (har bo'lak ~5–25 ms, oralarida brauzer
+  kadr chizadi) — avval bitta mashina sahifani 40–190 ms qotirardi;
 - meshopt geometriyasi alohida oqimlarda (Web Worker) ochiladi;
 - garajdagi soya xaritasi faqat biror narsa qimirlaganda qayta chiziladi;
-- kuchsiz GPU'da sifat avtomatik pasayadi (MSAA → piksel zichligi → pol aksi);
+- kuchsiz GPU'da (~38 kadr/s dan sekin) sifat avtomatik pasayadi (MSAA → piksel zichligi → pol aksi);
 - 3D kadr o'lchami canvas'ning o'zidan olinadi (`100lvh`): telefonda manzil paneli yashirilib/chiqqanda
   render target'lar qayta yaratilmaydi va rasm cho'zilmaydi;
 - telefonda hech narsa qimirlamayotganda sahna 30 kadr/s chiziladi (telefon qizib, sekinlashib qolmaydi);
   port shaderlari skroll to'xtagan paytda tayyorlanadi;
-- telefonda videolar va panellar ustidagi `backdrop-filter` (xiralashtirish) o'rniga zich fon;
+- 3D sahna, videolar va header ustida `backdrop-filter` (xiralashtirish) yo'q — zich fon;
+- obzor videolari faqat yarmidan ko'pi ekranda bo'lsa o'ynaydi;
 - `manifest.json` dagi `v` — model fayli xeshi: model `?v=...` bilan so'raladi va brauzer keshida
   uzoq saqlanadi (`vercel.json` → `headers`). Model o'zgarsa `npm run models` xeshni o'zi yangilaydi.
 
@@ -137,6 +144,8 @@ Yangi model qo'shish:
 1. `.glb` faylni loyiha papkasiga qo'ying.
 2. `tools/optimize-models.mjs` dagi `MODELS` ro'yxatiga qo'shing (`length` — haqiqiy uzunlik, metr).
 3. `npm run models -- <id>` — siqilgan model `public/models/<id>.glb` ga tushadi.
+   Kuzovda dog'/chok ko'rinsa — `keepMat` (kuzov materiali soddalashtirilmaydi) va kerak bo'lsa `paintTris`
+   (kuzov alohida, juda kichik xato bilan soddalashtirilib, normallari qayta hisoblanadi; misol: `maybach`).
 4. `src/data/cars.js` ga mashinani qo'shing. `paintRe` — kuzov materiali nomi.
    Material nomlarini ko'rish: `node tools/inspect.mjs public/models/<id>.glb`.
 5. Katalog rasmi: `npm run dev`, keyin http://localhost:5173/dev/render.html oching —

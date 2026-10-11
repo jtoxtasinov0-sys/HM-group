@@ -11,7 +11,7 @@ import { createPort } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
 import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR, PORT_HAZE } from './story.js';
-import { rigWheels } from './wheels.js';
+import { rigWheels, rigWheelsAsync } from './wheels.js';
 
 const FS_VERT = /* glsl */`
   precision highp float;
@@ -136,6 +136,9 @@ const idle = (timeout = 300) => new Promise((resolve) => {
   if (window.requestIdleCallback) requestIdleCallback(resolve, { timeout });
   else setTimeout(() => { const t = performance.now(); resolve({ timeRemaining: () => Math.max(0, 8 - (performance.now() - t)) }); }, 16);
 });
+
+/** Asosiy oqimni bir lahzaga bo'shatadi: brauzer kadr chizib oladi, ish darhol davom etadi */
+const yieldTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((r) => setTimeout(r, 0)));
 
 let meshoptWorkers = false;
 
@@ -268,8 +271,16 @@ export class World {
 
   /** Fondagi og'ir ishni navbatga qo'yadi: ishlar bir-birining ustiga tushmaydi */
   later(job) {
-    this.work = this.work.then(job).catch((e) => console.warn(e));
+    this.work = this.work.then(() => this.afterIntro()).then(job).catch((e) => console.warn(e));
     return this.work;
+  }
+
+  /** Kirish animatsiyasi (kamera, chiroqlar) paytida og'ir ishlar kutib turadi — u qotmasdan, silliq o'tsin */
+  afterIntro() {
+    return new Promise((resolve) => {
+      const check = () => (this.intro <= 0.12 ? resolve() : setTimeout(check, 120));
+      check();
+    });
   }
 
   /**
@@ -528,7 +539,9 @@ export class World {
     const f = this.load.fileOf(e.car);
     const model = this.load.uses.get(f) > 1 ? cloneCar(g.scene) : g.scene;
     if (background) await idle();
-    const rig = rigWheels(model, e.car.wheels);
+    // fonda — bo'laklarga bo'lib, oralarida brauzer kadr chizadi (bitta uzun vazifa skrollni qotirmasin)
+    const rig = background ? await rigWheelsAsync(model, e.car.wheels, yieldTask) : rigWheels(model, e.car.wheels);
+    if (background) await idle();
     const { mats } = prepareCarMaterials(model, e.car);
     model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
     if (background) {
@@ -566,8 +579,8 @@ export class World {
       setTimeout(() => this.loadShip(), 4000);
       return;
     }
-    // port shaderlari — sayt ochilish animatsiyasi tugagach (u silliq o'tsin)
-    setTimeout(() => this.later(() => this.warmPort()), 1500);
+    // port shaderlari — sayt ochilish animatsiyasi tugagach va skroll to'xtagan paytda (kadr qotishi sezilmasin)
+    setTimeout(() => this.calm().then(() => this.later(() => this.warmPort())), 1500);
     this.loadShip();
   }
 
@@ -575,7 +588,7 @@ export class World {
     if (this.shipLoading) return;
     this.shipLoading = true;
     this.load.get('ship').then(async (g) => {
-      // telefonda kema va port shaderlari skroll to'xtagan paytda tayyorlanadi — kadr qotishi sezilmasin
+      // kema va port shaderlari skroll to'xtagan paytda tayyorlanadi — kadr qotishi sezilmasin
       await this.calm();
       return this.later(async () => {
         await idle();
@@ -588,9 +601,8 @@ export class World {
     }).catch((e) => console.warn('ship load failed', e));
   }
 
-  /** Telefonda: foydalanuvchi skroll qilmay turgan paytni kutadi (port kerak bo'lib qolsa — kutmaydi) */
+  /** Foydalanuvchi skroll qilmay turgan paytni kutadi (port kerak bo'lib qolsa — kutmaydi) */
   async calm(ms = 700) {
-    if (!this.lazy) return;
     while (performance.now() - this.lastInput < ms && this.targetP < 0.4) await new Promise((r) => setTimeout(r, 200));
   }
 
@@ -695,7 +707,8 @@ export class World {
     pf.warm += dt;
     pf.ema += (dt - pf.ema) * 0.05;
     if (pf.warm < 4) return;  // birinchi soniyalar: shaderlar kompilyatsiyasi
-    pf.slowFor = pf.ema > 1 / 28 ? pf.slowFor + dt : 0;
+    // ~38 kadr/s dan sekin bo'lsa — sifat bir pog'ona pasayadi (skroll silliq bo'lishi muhimroq)
+    pf.slowFor = pf.ema > 1 / 38 ? pf.slowFor + dt : 0;
     if (pf.slowFor < 2.5) return;
     pf.slowFor = 0;
     pf.warm = 2;

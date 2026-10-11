@@ -9,7 +9,34 @@ const CALIPER_RE = /calip/i;
  * o'lchanadi. Markaz noto'g'ri bo'lsa g'ildirak boshqa nuqta atrofida aylanib, kuzovdan "chiqib ketadi".
  * Qaytaradi: har chorak uchun { R, cy, zc, x0, x1 } yoki null.
  */
-function measureTires(items, quad, minY) {
+/**
+ * Bir xil joydagi (0.5 mm) vertekslarni birlashtiradi — UV/normal choklari bo'linib ketmasin.
+ * Typed massivdagi ochiq adresli xesh: Map'dagi katta sonli kalitlardan bir necha baravar tez.
+ * Qaytaradi: wid (verteks → guruh), rep (guruh → birinchi verteks), W (guruhlar soni)
+ */
+function weldIds(pos, n) {
+  const size = 1 << Math.ceil(Math.log2(n * 2 + 2));
+  const mask = size - 1;
+  const table = new Int32Array(size).fill(-1);
+  const keys = new Int32Array(n * 3);
+  const wid = new Int32Array(n);
+  const rep = new Int32Array(n);
+  let W = 0;
+  for (let i = 0; i < n; i++) {
+    const kx = Math.round(pos[i * 3] * 2000), ky = Math.round(pos[i * 3 + 1] * 2000), kz = Math.round(pos[i * 3 + 2] * 2000);
+    keys[i * 3] = kx; keys[i * 3 + 1] = ky; keys[i * 3 + 2] = kz;
+    let h = (Math.imul(kx, 73856093) ^ Math.imul(ky, 19349663) ^ Math.imul(kz, 83492791)) & mask;
+    for (;;) {
+      const r = table[h];
+      if (r < 0) { table[h] = i; wid[i] = W; rep[W++] = i; break; }
+      if (keys[r * 3] === kx && keys[r * 3 + 1] === ky && keys[r * 3 + 2] === kz) { wid[i] = wid[r]; break; }
+      h = (h + 1) & mask;
+    }
+  }
+  return { wid, rep, W };
+}
+
+function* measureTires(items, quad, minY) {
   const box = Array.from({ length: 4 }, () => ({ x0: Infinity, x1: -Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity, n: 0 }));
   for (const { mesh, pos } of items) {
     const index = mesh.geometry.index?.array;
@@ -18,18 +45,10 @@ function measureTires(items, quad, minY) {
     let seeded = false;
     for (let i = 1; i < pos.length; i += 3) if (pos[i] < minY + 0.004) { seeded = true; break; }
     if (!seeded) continue;
+    yield;
 
-    // bir xil joydagi vertekslarni birlashtiramiz (UV/normal choklari bo'linib ketmasin)
-    const ids = new Map();
-    const wid = new Int32Array(n);
-    const rep = [];
-    for (let i = 0; i < n; i++) {
-      const k = ((Math.round(pos[i * 3] * 2000) + 8192) * 16384 + (Math.round(pos[i * 3 + 1] * 2000) + 8192)) * 16384 + (Math.round(pos[i * 3 + 2] * 2000) + 8192);
-      let id = ids.get(k);
-      if (id === undefined) { id = rep.length; ids.set(k, id); rep.push(i); }
-      wid[i] = id;
-    }
-    const W = rep.length;
+    const { wid, rep, W } = weldIds(pos, n);
+    yield;
     // verteks → uchburchaklar (CSR)
     const start = new Int32Array(W + 1);
     for (let t = 0; t < index.length; t++) start[wid[index[t]] + 1]++;
@@ -40,6 +59,7 @@ function measureTires(items, quad, minY) {
 
     const seen = new Uint8Array(W);
     for (let q = 0; q < 4; q++) {
+      yield;
       const stack = [];
       for (let v = 0; v < W; v++) {
         const i = rep[v];
@@ -86,24 +106,73 @@ function measureTires(items, quad, minY) {
  * Qaytaradi: { wheels, radius, roll(masofa), steer(burchak) }
  */
 export function rigWheels(model, opt = {}) {
-  const inset = opt.inset ?? 0.05;
-  model.updateMatrixWorld(true);
-  const toModel = new THREE.Matrix4().copy(model.matrixWorld).invert();
+  const steps = rigSteps(model, opt);
+  let r;
+  while (!(r = steps.next()).done);
+  return r.value;
+}
 
-  // 1) barcha vertekslar model koordinatalarida
-  const items = [];
-  model.traverse((o) => {
-    if (!o.isMesh || Array.isArray(o.material) || !o.geometry?.attributes.position) return;
-    const M = new THREE.Matrix4().multiplyMatrices(toModel, o.matrixWorld);
-    const pa = o.geometry.attributes.position;
-    const pos = new Float32Array(pa.count * 3);
+/**
+ * Xuddi rigWheels, lekin ish bo'laklarga bo'linadi: har bo'lakdan keyin pause() kutiladi (masalan, brauzer bo'sh
+ * payti). Sayt ochiq turganda fonda yuklangan mashina bitta uzun vazifa bilan sahifani qotirmaydi.
+ */
+export async function rigWheelsAsync(model, opt = {}, pause) {
+  const steps = rigSteps(model, opt);
+  let r;
+  while (!(r = steps.next()).done) await pause();
+  return r.value;
+}
+
+// normallashtirilgan (kvantlangan) pozitsiyalar uchun ko'paytuvchi — three.js denormalize bilan bir xil
+const DENORM = new Map([[Int8Array, 127], [Uint8Array, 255], [Int16Array, 32767], [Uint16Array, 65535]]);
+
+/** Mesh vertekslari model koordinatalarida (tez yo'l: oddiy massiv, kerak bo'lsa denormalizatsiya) */
+function modelPositions(pa, M) {
+  const pos = new Float32Array(pa.count * 3);
+  const e = M.elements;
+  // oddiy va "interleaved" (kvantlangan modellarda: qadam 4, bitta bo'sh) atributlar bir xil o'qiladi
+  const il = pa.isInterleavedBufferAttribute;
+  const a = il ? pa.data.array : pa.array;
+  const stride = il ? pa.data.stride : pa.itemSize;
+  const off = il ? pa.offset : 0;
+  if (pa.itemSize < 3) {
     const v = new THREE.Vector3();
     for (let i = 0; i < pa.count; i++) {
       v.fromBufferAttribute(pa, i).applyMatrix4(M);
       pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
     }
-    items.push({ mesh: o, pos });
+    return pos;
+  }
+  const div = pa.normalized ? DENORM.get(a.constructor) || 1 : 1;
+  const signed = a instanceof Int8Array || a instanceof Int16Array;
+  for (let i = 0; i < pa.count; i++) {
+    const s = i * stride + off;
+    let x = a[s] / div, y = a[s + 1] / div, z = a[s + 2] / div;
+    if (signed && div !== 1) { x = Math.max(x, -1); y = Math.max(y, -1); z = Math.max(z, -1); }
+    pos[i * 3] = e[0] * x + e[4] * y + e[8] * z + e[12];
+    pos[i * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+    pos[i * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+  }
+  return pos;
+}
+
+function* rigSteps(model, opt) {
+  const inset = opt.inset ?? 0.05;
+  model.updateMatrixWorld(true);
+  const toModel = new THREE.Matrix4().copy(model.matrixWorld).invert();
+
+  // 1) barcha vertekslar model koordinatalarida
+  const meshes = [];
+  model.traverse((o) => {
+    if (!o.isMesh || Array.isArray(o.material) || !o.geometry?.attributes.position) return;
+    meshes.push(o);
   });
+  const items = [];
+  for (const o of meshes) {
+    const M = new THREE.Matrix4().multiplyMatrices(toModel, o.matrixWorld);
+    items.push({ mesh: o, pos: modelPositions(o.geometry.attributes.position, M) });
+    yield;
+  }
 
   // 2) shinalarning yerga tegish joylari → 4 ta g'ildirak markazi
   let minY = Infinity;
@@ -119,7 +188,8 @@ export function rigWheels(model, opt = {}) {
       a.x0 = Math.min(a.x0, ax); a.x1 = Math.max(a.x1, ax);
     }
   }
-  const tires = opt.r ? [] : measureTires(items, quad, minY);
+  yield;
+  const tires = opt.r ? [] : yield* measureTires(items, quad, minY);
   const wheels = acc.map((a, q) => {
     const sx = q % 2 ? 1 : -1;
     const front = q >= 2;
@@ -165,23 +235,38 @@ export function rigWheels(model, opt = {}) {
       any = true;
     }
     if (!any) continue;
+    yield;
 
-    const index = geo.index ? geo.index.array : Array.from({ length: n }, (_, i) => i);
-    const body = [];
-    const parts = [[], [], [], []];
-    for (let t = 0; t < index.length; t += 3) {
-      const a = index[t], b = index[t + 1], c = index[t + 2];
+    // Uchburchaklar 5 guruhga (4 g'ildirak + kuzov) bo'linadi. Ikki o'tish (sanash, to'ldirish) va tayyor typed
+    // massivlar: oddiy massivga millionlab push qilish asosiy oqimni o'nlab ms band qilib, sahifani qotirardi
+    const index = geo.index ? geo.index.array : null;
+    const len = index ? index.length : n;
+    const groupOf = (t) => {
+      const a = index ? index[t] : t, b = index ? index[t + 1] : t + 1, c = index ? index[t + 2] : t + 2;
       const q = tag[a];
-      if (q >= 0 && q === tag[b] && q === tag[c]) parts[q].push(a, b, c);
-      else body.push(a, b, c);
+      return q >= 0 && q === tag[b] && q === tag[c] ? q : 4;
+    };
+    const counts = [0, 0, 0, 0, 0];
+    for (let t = 0; t < len; t += 3) counts[groupOf(t)] += 3;
+    if (counts[4] === len) continue;
+    yield;
+    const IndexArray = n > 65535 ? Uint32Array : Uint16Array;
+    const groups = counts.map((c) => new IndexArray(c));
+    const fill = [0, 0, 0, 0, 0];
+    for (let t = 0; t < len; t += 3) {
+      const k = groupOf(t), g = groups[k];
+      let f = fill[k];
+      g[f++] = index ? index[t] : t; g[f++] = index ? index[t + 1] : t + 1; g[f++] = index ? index[t + 2] : t + 2;
+      fill[k] = f;
     }
-    if (parts.every((p) => !p.length)) continue;
+    const parts = groups.slice(0, 4);
+    const body = groups[4];
 
     // geometriya boshqa meshlar bilan bo'lishilgan bo'lishi mumkin — atributlarni ulashib, indeksni almashtiramiz
     const sub = (idx) => {
       const g = new THREE.BufferGeometry();
       for (const k in geo.attributes) g.setAttribute(k, geo.attributes[k]);
-      g.setIndex(idx);
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
       g.boundingSphere = geo.boundingSphere;
       g.boundingBox = geo.boundingBox;
       return g;
@@ -199,6 +284,7 @@ export function rigWheels(model, opt = {}) {
     });
     if (body.length) mesh.geometry = sub(body);
     else mesh.removeFromParent();
+    yield;
   }
 
   let travel = 0;
