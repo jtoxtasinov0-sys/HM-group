@@ -121,19 +121,27 @@ telefon yengil faylni, kompyuter to'liqini oladi (`vite.config.js`, `media`).
 Kompyuterda garajdagi barcha mashinalar va kema yuklanadi (~38 MB). Telefonda (portret) kadrda bir vaqtda 2–3 ta
 mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~7 MB),
 qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Modellar markazdan chetga
-tartibda, bir vaqtda 2 tadan yuklanadi. Kompyuterda yuklovchi garajdagi hamma mashinalarni (~35 MB) kutadi, lekin
-ko'pi bilan 7 soniya (`WAIT_ALL`): internet sekin bo'lsa sayt markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB) bilan
-ochiladi. Telefonda faqat tanlangan mashina (G 63, ~1.5 MB) kutiladi. Darvoza ko'tarilgach tayyor mashinalar
-markazdan chetga birin-ketin paydo bo'ladi (`REVEAL_DELAY`, `REVEAL_STEP` — `world.js`); keyin yuklanganlari
-kelishi bilan shu navbat oxiriga qo'shiladi. Kema oxirida yuklanadi (foydalanuvchi skrollni boshlasa — oldinroq).
+tartibda, bir vaqtda 2 tadan yuklanadi. Yuklovchi faqat tanlangan mashinani kutadi (G 63: kompyuterda ~3.4 MB,
+telefonda ~1.5 MB; u yuklanayotganda boshqa fayllar boshlanmaydi — kanal to'liq unga). Avval kompyuterda hamma
+mashinalar (~35 MB, 7 soniyagacha) kutilardi. Darvoza ko'tarilgach mashinalar markazdan chetga birin-ketin paydo
+bo'ladi (`REVEAL_DELAY`, `REVEAL_STEP` — `world.js`): qolganlari fonda yuklanib, shaderlari tayyor bo'lishi bilan shu
+navbatga qo'shiladi. Kema oxirida yuklanadi (foydalanuvchi skrollni boshlasa — oldinroq).
 Sichqoncha borgan / tanlangan mashina navbatda oldinga o'tadi. Bir model bir necha
 rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`).
 
 Tezlik uchun (qotmasligi uchun):
 
-- fondagi og'ir ishlar (model tayyorlash, shaderlar, teksturalarni GPU'ga yuklash) brauzer bo'sh paytlariga
-  bo'lib qo'yiladi va kirish animatsiyasi tugaguncha kutib turadi; port sahnasi (kran, kema, okean) skroll
-  to'xtagan paytda, hikoyaga yetib kelguncha oldindan tayyorlanadi;
+- sayt ochilishi uchun faqat garaj ichi quriladi; hovli (darvoza ortida), konteyner va port (kran, okean) sayt
+  ochilgandan keyin fonda, bo'laklab quriladi (`world.js` → `buildRest`). Foydalanuvchi ularga undan tez yetib
+  kelsa — o'sha zahoti quriladi (`ensureYard`, `ensurePort`). Konteyner ichidagi chiroq sahnada boshidan turadi:
+  chiroqlar soni o'zgarsa barcha shaderlar qaytadan kompilyatsiya bo'lardi;
+- garaj shaderlari (soya xaritasi va yakuniy kadr shaderlari bilan) va teksturalari mashina modeli yuklanayotgan
+  paytda tayyorlanadi; mashinalarniki — ular sahnaga qo'yilishidan oldin (sayt ochilishi buni kutmaydi);
+- modellar ro'yxati (`manifest.json`) JS ichida — alohida so'rov yo'q; Inter shrifti kutilmaydi (canvas yozuvlari
+  shrift kelgach chiziladi); obzor muqovalari bo'lim ekranga yaqinlashganda yuklanadi;
+- fondagi og'ir ishlar (model tayyorlash, shaderlar, teksturalarni GPU'ga yuklash) kadrlar orasidagi kichik
+  bo'laklarga bo'lib qo'yiladi (`idle`: requestIdleCallback emas — 3D sahna har kadrda chizilganda brauzer deyarli
+  hech qachon "bo'sh" bo'lmaydi). Hovli va port kirish animatsiyasi tugagach quriladi, port — skroll to'xtagan paytda;
 - g'ildiraklarni ajratish (`wheels.js`) fonda bo'laklarga bo'linadi (har bo'lak ~5–25 ms, oralarida brauzer
   kadr chizadi) — avval bitta mashina sahifani 40–190 ms qotirardi;
 - meshopt geometriyasi alohida oqimlarda (Web Worker) ochiladi;

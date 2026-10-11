@@ -300,9 +300,12 @@ export function createGarage({ quality }) {
   anim.stage = makeTurntable(G.stageR, G.stageRing, G.stage.x, G.stage.z);
 
   // ---------- HOVLI (eshik orqasi, konteyner turadigan joy) — kunduzgi ----------
+  // Osmon darhol (garajning muhit xaritasi undan olinadi), qolgani — anim.buildYard() bilan bo'laklab, sayt
+  // ochilgandan keyin: hovli faqat darvoza ochilganda ko'rinadi, u esa ochilishni ~0.3 s (telefonda ~1 s) kechiktirardi
   const yard = createYard(quality);
   group.add(yard.group);
   anim.yardSky = yard.sky;
+  anim.buildYard = yard.step;
 
   // ---------- YORUG'LIK ----------
   const HEMI = 0.56, KEY = 0.55;
@@ -401,14 +404,27 @@ export function createGarage({ quality }) {
   return { group, anim, floor };
 }
 
-/** Darvoza orqasidagi ochiq hovli: osmon, beton maydon, chiziqlar, atrofda konteynerlar, devor, chiroqlar */
+/**
+ * Darvoza orqasidagi ochiq hovli: osmon, beton maydon, chiziqlar, atrofda konteynerlar, devor, chiroqlar.
+ * Osmon darhol yaratiladi, qolgani step() bilan bo'laklab (har chaqiruvda bitta bo'lak; hammasi tayyor — true)
+ */
 function createYard(quality) {
   const group = new THREE.Group();
   const sky = createSky({ sunDir: YARD_SUN, clouds: 0.38, gain: 1.05, ground: '#6d747c', sunGlow: '#fff0d6' });
   group.add(sky.mesh);
+  const steps = buildYard(quality, group);
+  let done = false;
+  const step = () => done || (done = steps.next().done);
+  return { group, sky, step };
+}
+
+function* buildYard(quality, parent) {
+  const group = new THREE.Group();
+  parent.add(group);
 
   // beton maydon
   const ct = makeConcreteTextures({ seed: 35, tone: 152 });
+  yield;
   const GW = 160, GD = 110, slab = 6;
   for (const t of [ct.map, ct.normalMap, ct.roughnessMap]) t.repeat.set(GW / slab, GD / slab);
   const ground = new THREE.Mesh(
@@ -434,6 +450,7 @@ function createYard(quality) {
   line(white, 3.62, 0.12, 0, G.container.z - 4.25);
   for (const x of [-5.5, 5.5]) line(yellow, 0.15, 60, x, G.wallZ - 32);
   for (let i = 0; i < 9; i++) line(yellow, 0.3, 2.2, -9 + i * 0.9, G.wallZ - 1.6, 0.7);
+  yield;
 
   // atrofdagi konteyner steklari
   const st = makeStackTextures();
@@ -465,6 +482,7 @@ function createYard(quality) {
   inst.castShadow = quality.shadows;
   inst.receiveShadow = true;
   group.add(inst);
+  yield;
 
   // perimetr devori va chiroq ustunlari
   const wallMat = new THREE.MeshStandardMaterial({ color: '#b9bec4', map: makeGrimeTexture(31), roughness: 0.9 });
@@ -486,5 +504,4 @@ function createYard(quality) {
     lamp.castShadow = true;
     group.add(lamp);
   }
-  return { group, sky };
 }
