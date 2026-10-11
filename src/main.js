@@ -108,7 +108,7 @@ function cardHTML(car, inCls = '') {
   <article class="card reveal${inCls}" data-type="${car.type}">
     <div class="card__media gallery">
       <div class="gallery__track">
-        ${Array.from({ length: n }, (_, i) => `<img src="${photoSrc(car.id, i + 1)}" alt="${name} — ${i + 1}/${n}" loading="lazy" decoding="async" draggable="false">`).join('')}
+        ${Array.from({ length: n }, (_, i) => `<img src="${photoSrc(car.id, i + 1)}" alt="${name} – ${i + 1}/${n}" loading="lazy" decoding="async" draggable="false">`).join('')}
       </div>
       ${car.year ? `<span class="card__tag">${car.year}</span>` : ''}
       <span class="gallery__count"><b>1</b> / ${n}</span>
@@ -212,7 +212,7 @@ function updateReels() {
     const title = REELS[i].title[lang()];
     $('.reel__title', el).textContent = title;
     $('.reel__watch', el).textContent = t('reels.watch');
-    $('.reel__link', el).setAttribute('aria-label', `${title} — ${t('reels.watch')}`);
+    $('.reel__link', el).setAttribute('aria-label', `${title} – ${t('reels.watch')}`);
   });
 }
 $('#reels').addEventListener('click', (e) => {

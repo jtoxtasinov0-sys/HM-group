@@ -275,8 +275,11 @@ h1, h2, h3, p { margin: 0; }
 .chapter__list li::before { content: ''; width: 18px; height: 18px; flex: none; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5); background: radial-gradient(circle, #fff 0 2.5px, transparent 3px); }
 .chapter--final { left: auto; right: calc(var(--gutter) + 70px); }
 .days { display: flex; align-items: flex-end; gap: 14px; margin-top: 14px; }
-/* katta raqamlardagi tire: zich harf oralig'ida raqamlarga yopishmasin */
-.dash { font-style: normal; margin: 0 .07em; letter-spacing: 0; }
+/* "40–45" dagi tire: Inter'da "–" yarim em uzun va raqamlarga yopishib turadi — qisqartiriladi
+   (oralarida ozgina joy qoladi) va 'case' bilan raqamlar o'rtasiga ko'tariladi */
+.dash { display: inline-block; font-style: normal; letter-spacing: 0; margin: 0 -.04em; transform: scaleX(.6); font-feature-settings: 'case'; }
+/* katta harfli yozuvlarda ham tire harflar o'rtasida turadi (pastga tushib qolmaydi) */
+.scrollcue, .showcase__price, .chapter__num, .stat span { font-feature-settings: 'case'; }
 /* "40–45" bitta qatorda turadi (tire oldidan/keyin qatorga bo'linmaydi) va kartochka kengligiga sig'adi */
 .days__num { flex: none; white-space: nowrap; font-size: clamp(56px, 5.6vw, 84px); font-weight: 600; line-height: .8; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
 .days__label { padding-bottom: 8px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--w2); }
@@ -482,7 +485,7 @@ html.has-player { overflow: hidden; scrollbar-gutter: stable; }
 /* chiziq: punktir — qolgan yo'l, to'q — bosib o'tilgan yo'l; nuqta skroll bilan Koreyadan O'zbekistonga yuradi */
 .routebar__line { --p: 1; position: relative; flex: 1; height: 0; border-top: 1px dashed rgba(29, 62, 105, 0.45); container-type: inline-size; }
 .routebar__line s { position: absolute; left: 0; right: 0; top: -1.5px; height: 2px; background: var(--navy); transform: scaleX(var(--p)); transform-origin: left; }
-.routebar__line i { position: absolute; top: -7px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--navy); border: 3px solid #fff; box-shadow: 0 3px 8px rgba(3, 10, 22, 0.25); transform: translateX(calc(var(--p) * (100cqw - 13px))); }
+.routebar__line > i { position: absolute; top: -7px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--navy); border: 3px solid #fff; box-shadow: 0 3px 8px rgba(3, 10, 22, 0.25); transform: translateX(calc(var(--p) * (100cqw - 13px))); }
 .routebar__line em { position: absolute; left: 50%; top: -36px; transform: translateX(-50%); font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--navy); background: #fff; padding: 2px 10px; white-space: nowrap; }
 
 .contact { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(28px, 5vw, 72px); padding: clamp(32px, 5vw, 72px); border-radius: 30px; background: radial-gradient(120% 140% at 0% 0%, #2a5287 0%, var(--navy) 40%, var(--deep) 100%); color: #fff; overflow: hidden; position: relative; }
@@ -697,7 +700,7 @@ html.has-player { overflow: hidden; scrollbar-gutter: stable; }
   .routebar { flex-direction: column; align-items: stretch; }
   .routebar__line { height: 40px; width: 0; flex: none; margin: 10px auto; border-top: 0; border-left: 1px dashed rgba(29, 62, 105, 0.45); container-type: normal; }
   .routebar__line s { left: -1.5px; right: auto; top: 0; bottom: 0; width: 2px; height: auto; transform: scaleY(var(--p)); transform-origin: top; }
-  .routebar__line i { display: none; }
+  .routebar__line > i { display: none; }
   .routebar__line em { top: 50%; transform: translate(-50%, -50%); }
   .routebar__pt { text-align: center; }
 }
