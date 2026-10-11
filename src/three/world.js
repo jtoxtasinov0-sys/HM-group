@@ -155,6 +155,7 @@ export class World {
     this.quality = quality;
     this.onProgress = onProgress;
     this.p = 0;
+    this.pVel = 0; // hikoya progressining tezligi (1/s) — tick
     this.targetP = 0;
     this.selected = start;
     this.hovered = -1;
@@ -426,9 +427,13 @@ export class World {
     const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
     const fetcher = new THREE.FileLoader().setResponseType('arraybuffer');
     const fileOf = (car) => car.file || car.id;
+    // telefonda — yengil versiya (public/models/m/, npm run models:mobile): uchburchaklar ~3 baravar kam,
+    // fayl ~2 baravar yengil — tezroq yuklanadi va GPU'ga tushadi; kichik ekranda farqi ko'rinmaydi
+    const lite = (f) => this.quality.mobile && this.manifest[f]?.m;
+    const infoOf = (f) => (lite(f) ? this.manifest[f].m : this.manifest[f]);
     const urlOf = (f) => {
-      const v = this.manifest[f]?.v; // fayl o'zgarsa manzil ham o'zgaradi — brauzer keshidan bemalol olinadi
-      return `${import.meta.env.BASE_URL}models/${f}.glb${v ? `?v=${v}` : ''}`;
+      const v = infoOf(f)?.v; // fayl o'zgarsa manzil ham o'zgaradi — brauzer keshidan bemalol olinadi
+      return `${import.meta.env.BASE_URL}models/${lite(f) ? 'm/' : ''}${f}.glb${v ? `?v=${v}` : ''}`;
     };
     const jobs = new Map(); // fayl → { promise, onBytes }
     const queue = [];
@@ -469,7 +474,7 @@ export class World {
     if (!this.lazy) enqueue('ship'); // telefonda kema hikoyaga kirilganda so'raladi (tick → prioritize)
 
     this.load = {
-      fileOf, order, jobs, t0: performance.now(),
+      fileOf, infoOf, order, jobs, t0: performance.now(),
       // sayt ochilishi uchun albatta kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
       need: files.slice(0, narrow ? 1 : 2),
       // yuklovchi kutadiganlari: kompyuterda — hamma mashinalar (WAIT_ALL gacha), telefonda — faqat kerakligi
@@ -486,8 +491,8 @@ export class World {
 
   /** Joylarni modelsiz quradi va birinchi ko'rinadigan mashinalarni joylaydi (shu bilan sayt ochiladi) */
   async mountFirst() {
-    const { fileOf, need, want, jobs } = this.load;
-    const bytesOf = (f) => this.manifest[f]?.bytes || 3e6;
+    const { fileOf, infoOf, need, want, jobs } = this.load;
+    const bytesOf = (f) => infoOf(f)?.bytes || 3e6;
 
     const shadowTex = makeShadowTexture();
     const shadowMat = new THREE.MeshBasicMaterial({ alphaMap: shadowTex, color: '#0b0f16', transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
@@ -786,17 +791,32 @@ export class World {
     }
   }
 
+  /**
+   * Hikoya progressi skrollga "prujina" bilan ergashadi: tezlik ham silliq o'sib-kamayadi (kamera joyidan
+   * keskin qo'zg'almaydi) va chegaralangan. Telefonda barmoq bilan tez surilsa sahifa bir zumda bir necha ekran
+   * ketadi — avval kamera garajdan sahnaga bir lahzada "otilib", ekran yaqinlashib ketardi. Endi u o'z tezligida
+   * yetib boradi. Uzoq sakrashda (menyu havolasi, «tepaga») chegara oshadi — orqada uzoq qolib ketmaydi
+   */
+  followScroll(dt) {
+    const mobile = this.quality.mobile;
+    const d = this.targetP - this.p;
+    const w = mobile ? 6 : 10;
+    const vmax = (mobile ? 0.16 : 0.45) + Math.max(0, Math.abs(d) - 0.25) * 3;
+    this.pVel += (w * w * d - 2 * w * this.pVel) * dt;
+    this.pVel = Math.min(vmax, Math.max(-vmax, this.pVel));
+    this.p = Math.min(1, Math.max(0, this.p + this.pVel * dt));
+    if (Math.abs(this.targetP - this.p) < 1e-4 && Math.abs(this.pVel) < 2e-3) { this.p = this.targetP; this.pVel = 0; }
+  }
+
   tick() {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.time += dt;
+    // hikoya ekranda emas: qaytib kelganda kamera eski joyidan "quvib" kelmasin — darhol skroll joyida
+    if (!this.active) { this.p = this.targetP; this.pVel = 0; }
     if (!this.active || this.contextLost) return;
     this.adaptQuality(performance.now());
 
-    // scroll progressi — yumshoq. Telefonda barmoq bilan surish keskin (bir siljitishda bir necha ekran) —
-    // kamera sakramasin, sekinroq ergashadi
-    const k = 1 - Math.exp(-dt * (this.quality.mobile ? 3.6 : 7));
-    this.p += (this.targetP - this.p) * k;
-    if (Math.abs(this.targetP - this.p) < 1e-5) this.p = this.targetP;
+    this.followScroll(dt);
     this.mouseSmooth.lerp(this.mouse, 1 - Math.exp(-dt * 3));
 
     // hover (faqat garajda)

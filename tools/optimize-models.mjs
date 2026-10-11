@@ -196,5 +196,7 @@ for (const cfg of list) {
   manifest[cfg.id] = { box, tris: after, bytes: fs.statSync(out).size, v };
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
   const size = (fs.statSync(out).size / 1e6).toFixed(2);
+  // manifest yozuvi yangilandi — telefon versiyasi (m) undan tushib qoldi: qayta yaratilguncha telefon ham shu faylni oladi
+  if (fs.existsSync(path.join(OUT_DIR, 'm', `${cfg.id}.glb`))) console.log(`  -> telefon versiyasini yangilang: npm run models:mobile -- ${cfg.id}`);
   console.log(`${cfg.id.padEnd(9)} ${String(before).padStart(8)} -> ${String(after).padStart(7)} tris | ${size} MB | scale ${s.toFixed(4)} ${alongX ? '(rotated)' : ''} | ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
