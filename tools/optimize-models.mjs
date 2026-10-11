@@ -21,7 +21,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 // length — haqiqiy uzunlik (metr). rotY — old tomonini +Z ga burish (gradus).
 const MODELS = [
   { id: 'g63',      src: 'mercedes_benz_g-_class_amg_g_63.glb',          length: 4.87, rotY: 0,   maxTris: 240000 },
-  { id: 'maybach',  src: 'mercedes-benz_maybach_s450.glb',               length: 5.47, rotY: 0,   maxTris: 300000 },
+  { id: 'maybach',  src: 'mercedes-benz_maybach_s450.glb',               length: 5.47, rotY: 0,   maxTris: 360000, keepMat: /^Car_Paint_With_Flakes$/, paintTris: 230000 },
   { id: 'staria',   src: '2022_hyundai_staria_premium.glb',              length: 5.25, rotY: 0,   maxTris: 240000, error: 0.003 },
   { id: 'ev9',      src: '2024_kia_ev9_gt-line.glb',                     length: 5.01, rotY: 0,   maxTris: 240000, error: 0.004, tex: 512, keepTex: /^(disk|Tire|Grill|Plate|GT_Line_Badge|Light)$/ },
   { id: 'urus',     src: '2025_lamborghini_urus_se.glb',                 length: 5.12, rotY: 0,   maxTris: 240000 },
@@ -48,6 +48,32 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
   'meshopt.decoder': MeshoptDecoder,
   'meshopt.encoder': MeshoptEncoder,
 });
+
+/**
+ * Silliq normallar (uchburchak yuzasi bo'yicha o'rtacha). Soddalashtirishda vertekslar suriladi, eski normallar esa
+ * qoladi — lakli kuzovda xira dog'lar va "chok"lar shundan. Payvandlangan (weld) verteks qo'shni uchburchaklardan
+ * yangi normal oladi; keskin qirralar (alohida vertekslar) saqlanadi.
+ */
+function smoothNormals(prim) {
+  const pos = prim.getAttribute('POSITION')?.getArray();
+  const idx = prim.getIndices()?.getArray();
+  const nrm = prim.getAttribute('NORMAL');
+  if (!pos || !idx || !nrm) return;
+  const n = new Float32Array(pos.length);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; // uzunligi = 2 × yuza
+    for (const v of [a, b, c]) { n[v] += nx; n[v + 1] += ny; n[v + 2] += nz; }
+  }
+  const old = nrm.getArray();
+  for (let i = 0; i < n.length; i += 3) {
+    const l = Math.hypot(n[i], n[i + 1], n[i + 2]);
+    if (l > 1e-12) { n[i] /= l; n[i + 1] /= l; n[i + 2] /= l; } else { n[i] = old[i]; n[i + 1] = old[i + 1]; n[i + 2] = old[i + 2]; }
+  }
+  nrm.setArray(n);
+}
 
 const countTris = (doc) => {
   let t = 0;
@@ -109,7 +135,16 @@ for (const cfg of list) {
     const prims = root.listMeshes().flatMap((m) => m.listPrimitives());
     const primTris = (p) => (p.getIndices() ? p.getIndices().getCount() : p.getAttribute('POSITION').getCount()) / 3;
     const kept = prims.filter((p) => cfg.keepMat.test(p.getMaterial()?.getName() || ''));
-    const keptTris = kept.reduce((s, p) => s + primTris(p), 0);
+    let keptTris = kept.reduce((s, p) => s + primTris(p), 0);
+    // paintTris: bo'yoq juda ko'p uchburchakli bo'lsa (fayl og'ir) — u ham soddalashtiriladi, lekin alohida,
+    // juda kichik xato bilan, keyin normallari qayta hisoblanadi (dog' qolmaydi)
+    if (cfg.paintTris && keptTris > cfg.paintTris) {
+      for (const p of kept) {
+        simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio: cfg.paintTris / keptTris, error: cfg.paintError || 0.0006 });
+        smoothNormals(p);
+      }
+      keptTris = kept.reduce((s, p) => s + primTris(p), 0);
+    }
     const ratio = Math.min(1, Math.max(0.05, (cfg.maxTris - keptTris) / (tris - keptTris)));
     if (ratio < 1) for (const p of prims) {
       if (kept.includes(p)) continue;

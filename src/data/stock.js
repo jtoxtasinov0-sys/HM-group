@@ -13,8 +13,9 @@ export const STOCK = [
   {
     id: 'porsche-911-turbo-s', dir: '01_Porsche_911_Turbo_S_Green', photos: 4,
     brand: 'Porsche', model: '911 Turbo S', type: 'sport',
-    year: '2026.07',
+    year: '2026',
     color: { uz: 'Oak Green Metallic Neo · salon qora', ru: 'Oak Green Metallic Neo · салон чёрный' },
+    note: { uz: 'Ishlab chiqarilgan: 2026-yil iyul', ru: 'Выпуск: июль 2026' },
     ig: 'https://www.instagram.com/p/Dd73bx-k9gf/',
   },
   {
@@ -39,7 +40,7 @@ export const STOCK = [
     id: 'mercedes-e300-amg', dir: '05_Mercedes_E300_AMG', photos: 4,
     brand: 'Mercedes-Benz', model: 'E 300 AMG', type: 'sedan',
     year: '2026', engine: PETROL('2.0'), hp: 285, km: 0,
-    note: { uz: 'To\'liq privod', ru: 'Полный привод' },
+    note: { uz: 'Toʻliq privod', ru: 'Полный привод' },
     ig: 'https://www.instagram.com/p/DaknlXcCStf/',
   },
   {
@@ -79,13 +80,13 @@ export const STOCK = [
 
 // Obzor videolari (Instagram Reels) — «Obzorlar» bo'limi
 export const REELS = [
-  { id: 'DTNWGIZko-m', title: { uz: 'BMW 740i va Mercedes G63 — miniobzor', ru: 'BMW 740i и Mercedes G63 — мини-обзор' } },
-  { id: 'DYi_R_rplIA', title: { uz: 'Mercedes-Benz GLS 450 full option', ru: 'Mercedes-Benz GLS 450 full option' } },
-  { id: 'DYMBIUsJLRT', title: { uz: 'Mercedes-Benz G63', ru: 'Mercedes-Benz G63' } },
-  { id: 'DX63AbFJ_U3', title: { uz: 'Mercedes-Benz E300 AMG (140 yillik)', ru: 'Mercedes-Benz E300 AMG (140 лет)' } },
+  { id: 'DTNWGIZko-m', title: { uz: 'BMW 740i va Mercedes-AMG G 63 — mini-obzor', ru: 'BMW 740i и Mercedes-AMG G 63 — мини-обзор' } },
+  { id: 'DYi_R_rplIA', title: { uz: 'Mercedes-Benz GLS 450 — toʻliq komplektatsiya', ru: 'Mercedes-Benz GLS 450 — полная комплектация' } },
+  { id: 'DYMBIUsJLRT', title: { uz: 'Mercedes-AMG G 63', ru: 'Mercedes-AMG G 63' } },
+  { id: 'DX63AbFJ_U3', title: { uz: 'Mercedes-Benz E 300 AMG — 140 yillik', ru: 'Mercedes-Benz E 300 AMG — 140 лет' } },
   { id: 'DWYvFwZCSps', title: { uz: 'Mercedes-AMG GT 63 S Performance', ru: 'Mercedes-AMG GT 63 S Performance' } },
   { id: 'DUpvHsvjAGi', title: { uz: 'Mercedes-AMG GT 63 E Performance', ru: 'Mercedes-AMG GT 63 E Performance' } },
-  { id: 'Dd_o381p09S', title: { uz: 'Mercedes-Benz S450L AMG', ru: 'Mercedes-Benz S450L AMG' } },
+  { id: 'Dd_o381p09S', title: { uz: 'Mercedes-Benz S 450 L AMG', ru: 'Mercedes-Benz S 450 L AMG' } },
   { id: 'Dd81cNzzegW', title: { uz: 'Porsche 911 Turbo S', ru: 'Porsche 911 Turbo S' } },
 ];
 export const reelUrl = (id) => `https://www.instagram.com/reel/${id}/`;

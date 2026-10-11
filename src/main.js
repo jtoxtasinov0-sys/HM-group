@@ -1,5 +1,5 @@
 import Lenis from 'lenis';
-import { GARAGE, GARAGE_START, byId } from './data/cars.js';
+import { GARAGE, GARAGE_START } from './data/cars.js';
 import { STOCK, REELS, reelUrl } from './data/stock.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
@@ -83,10 +83,9 @@ new IntersectionObserver(([en]) => {
   if (en.isIntersecting) navLinks.forEach((a) => { a.classList.remove('is-current'); a.removeAttribute('aria-current'); });
 }, { rootMargin: '-45% 0px -50% 0px' }).observe($('#story'));
 
-// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Mijozlar ----------------
+// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar ----------------
 // sayt papkada joylashsa ham ishlashi uchun (masalan, GitHub Pages: /HM-group/)
 const BASE = import.meta.env.BASE_URL;
-const renderSrc = (id) => `${BASE}renders/${id}.webp`;
 const photoSrc = (id, n) => `${BASE}cars/${id}/${n}.webp`;
 const specRow = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
 const lang = () => getLang();
@@ -179,12 +178,12 @@ const player = $('#player');
 const playerVideo = $('.player__video', player);
 let playerIndex = 0;
 
-// Ekranda ko'rinib turgan har bir video o'ynaydi (bir piksel ko'rinsa ham), ko'rinmaydigani to'xtaydi — trafik tejaladi.
-// Telefonda «trafik tejash» yoqilgan bo'lsa — faqat muqova.
+// Ekranda yarmidan ko'pi ko'rinib turgan video o'ynaydi, qolganlari to'xtaydi: bir vaqtda 8 ta video
+// dekodlanib, skroll qotmasin (trafik ham tejaladi). Telefonda «trafik tejash» yoqilgan bo'lsa — faqat muqova.
 const PREVIEW_AUTOPLAY = !navigator.connection?.saveData;
 const previewIO = new IntersectionObserver((entries) => {
-  entries.forEach((en) => { en.target._inView = en.isIntersecting; syncPreview(en.target); });
-}, { rootMargin: '120px 0px' });
+  entries.forEach((en) => { en.target._inView = en.intersectionRatio >= 0.5; syncPreview(en.target); });
+}, { threshold: [0, 0.5] });
 function syncPreview(v) {
   if (v._inView && !player.open) v.play().catch(() => {});
   else v.pause();
@@ -287,21 +286,6 @@ $('#filters').addEventListener('click', (e) => {
   });
 });
 
-function renderClients() {
-  const ids = ['sportage', 'g63', 'ev9', 'escalade'];
-  const inCls = seen($('#clients'));
-  $('#clients').innerHTML = ids.map((id) => {
-    const c = byId(id);
-    return `<a class="clip reveal${inCls}" href="${IG}" target="_blank" rel="noopener">
-      <span class="clip__play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></span>
-      <img src="${renderSrc(id)}" alt="" loading="lazy" onerror="this.remove()">
-      <strong>${c.brand} ${c.model}</strong>
-      <span>${lang() === 'ru' ? 'Видео клиента' : 'Mijoz videosi'} · Instagram</span>
-    </a>`;
-  }).join('');
-  observeReveal($('#clients'));
-}
-
 // ---------------- Reveal + raqamlar ----------------
 // Bir vaqtda ekranga kirgan elementlar navbat bilan ochiladi (kechikish 5 qadam bilan cheklangan).
 // Animatsiya tugagach kechikish olib tashlanadi — hover darhol javob beradi.
@@ -365,7 +349,7 @@ function updateLogistics() {
 }
 new IntersectionObserver(([en]) => { logActive = en.isIntersecting; updateLogistics(); }, { rootMargin: '10% 0px' }).observe($('#logistika'));
 
-function renderAll() { renderCatalog(); renderClients(); }
+function renderAll() { renderCatalog(); }
 renderAll();
 renderReels();
 observeReveal();
@@ -415,8 +399,8 @@ function updateLayers(p) {
   railItems.forEach((li, i) => li.classList.toggle('is-active', i <= idx));
   rail.classList.toggle('is-hidden', p < 0.01);
   const k = seg(p, 0.815, 0.9);
-  const days = `${Math.round(DAYS[0] * k)}–${Math.round(DAYS[1] * k)}`;
-  if (days !== lastDays) { lastDays = days; daysNum.textContent = days; }
+  const days = `${Math.round(DAYS[0] * k)}<i class="dash">–</i>${Math.round(DAYS[1] * k)}`;
+  if (days !== lastDays) { lastDays = days; daysNum.innerHTML = days; }
 }
 
 // ---------------- Tanlangan mashina ma'lumotlari ----------------
