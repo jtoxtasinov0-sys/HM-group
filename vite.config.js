@@ -33,12 +33,17 @@ const preloadHero = {
     const manifest = JSON.parse(fs.readFileSync(path.resolve('public/models/manifest.json'), 'utf8'));
     const car = GARAGE[GARAGE_START];
     const file = car.file || car.id;
-    const v = manifest[file]?.v;
-    return [{
+    // telefonda (world.js → detectQuality: barmoq yoki kichik ekran) — yengil versiya (models/m/), kompyuterda — to'liq.
+    // media bo'yicha brauzer faqat keraklisini yuklaydi
+    const link = (dir, info, media) => ({
       tag: 'link',
-      attrs: { rel: 'preload', href: `${base}models/${file}.glb${v ? `?v=${v}` : ''}`, as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'high' },
+      attrs: { rel: 'preload', href: `${base}models/${dir}${file}.glb${info?.v ? `?v=${info.v}` : ''}`, as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'high', ...(media && { media }) },
       injectTo: 'head',
-    }];
+    });
+    const MOBILE = '(pointer: coarse), (max-width: 599px), (max-height: 599px)';
+    const m = manifest[file]?.m;
+    if (!m) return [link('', manifest[file], undefined)];
+    return [link('m/', m, MOBILE), link('', manifest[file], '(pointer: fine) and (min-width: 600px) and (min-height: 600px)')];
   },
 };
 

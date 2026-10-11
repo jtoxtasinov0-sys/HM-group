@@ -113,12 +113,17 @@ Asl `.glb` fayllar juda og'ir edi (jami ~1 GB). Ular siqildi va `public/models/`
 geometriya soddalashtirildi, meshopt bilan siqildi, teksturalar WebP ga o'tkazildi
 (masalan, Maybach: 81 MB → 3.4 MB).
 
+Telefonda modellarning yengil versiyasi yuklanadi (`public/models/m/`, `npm run models:mobile`): uchburchaklar
+~2–3 baravar kam, teksturalar 512 px gacha, fayllar ~2 baravar yengil (masalan, G 63: 3.4 MB → 1.5 MB, hammasi
+~38 MB → ~18 MB). Kichik ekranda farqi ko'rinmaydi. Birinchi mashina HTML bilan bir vaqtda `preload` qilinadi —
+telefon yengil faylni, kompyuter to'liqini oladi (`vite.config.js`, `media`).
+
 Kompyuterda garajdagi barcha mashinalar va kema yuklanadi (~38 MB). Telefonda (portret) kadrda bir vaqtda 2–3 ta
-mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~15 MB),
+mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~7 MB),
 qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Modellar markazdan chetga
 tartibda, bir vaqtda 2 tadan yuklanadi. Kompyuterda yuklovchi garajdagi hamma mashinalarni (~35 MB) kutadi, lekin
 ko'pi bilan 7 soniya (`WAIT_ALL`): internet sekin bo'lsa sayt markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB) bilan
-ochiladi. Telefonda faqat tanlangan mashina (G 63, ~3.4 MB) kutiladi. Darvoza ko'tarilgach tayyor mashinalar
+ochiladi. Telefonda faqat tanlangan mashina (G 63, ~1.5 MB) kutiladi. Darvoza ko'tarilgach tayyor mashinalar
 markazdan chetga birin-ketin paydo bo'ladi (`REVEAL_DELAY`, `REVEAL_STEP` — `world.js`); keyin yuklanganlari
 kelishi bilan shu navbat oxiriga qo'shiladi. Kema oxirida yuklanadi (foydalanuvchi skrollni boshlasa — oldinroq).
 Sichqoncha borgan / tanlangan mashina navbatda oldinga o'tadi. Bir model bir necha
@@ -136,6 +141,8 @@ Tezlik uchun (qotmasligi uchun):
 - kuchsiz GPU'da (~38 kadr/s dan sekin) sifat avtomatik pasayadi (MSAA → piksel zichligi → pol aksi);
 - 3D kadr o'lchami canvas'ning o'zidan olinadi (`100lvh`): telefonda manzil paneli yashirilib/chiqqanda
   render target'lar qayta yaratilmaydi va rasm cho'zilmaydi;
+- kamera skrollga "prujina" bilan, chegaralangan tezlikda ergashadi (`world.js` → `followScroll`): telefonda
+  barmoq bilan tez surilsa ham kamera garajdan sahnaga bir zumda "otilmaydi" — silliq yetib boradi;
 - telefonda hech narsa qimirlamayotganda sahna 30 kadr/s chiziladi (telefon qizib, sekinlashib qolmaydi);
   port shaderlari skroll to'xtagan paytda tayyorlanadi;
 - 3D sahna, videolar va header ustida `backdrop-filter` (xiralashtirish) yo'q — zich fon;
@@ -148,6 +155,7 @@ Yangi model qo'shish:
 1. `.glb` faylni loyiha papkasiga qo'ying.
 2. `tools/optimize-models.mjs` dagi `MODELS` ro'yxatiga qo'shing (`length` — haqiqiy uzunlik, metr).
 3. `npm run models -- <id>` — siqilgan model `public/models/<id>.glb` ga tushadi.
+4. `npm run models:mobile -- <id>` — telefon versiyasi `public/models/m/<id>.glb` ga tushadi (model yangilanganda ham).
    Kuzovda dog'/chok ko'rinsa — `keepMat` (kuzov materiali soddalashtirilmaydi) va kerak bo'lsa `paintTris`
    (kuzov alohida, juda kichik xato bilan soddalashtirilib, normallari qayta hisoblanadi; misol: `maybach`).
 4. `src/data/cars.js` ga mashinani qo'shing. `paintRe` — kuzov materiali nomi.

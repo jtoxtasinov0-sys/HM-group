@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "models": "node tools/optimize-models.mjs",
+    "models:mobile": "node tools/optimize-mobile.mjs",
     "icons": "node tools/icons.mjs",
     "photos": "node tools/optimize-photos.mjs",
     "reels": "node tools/optimize-reels.mjs",
