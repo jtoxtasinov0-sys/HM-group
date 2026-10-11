@@ -11,16 +11,6 @@
 
 export const CARS = [
   {
-    id: 'ev9', brand: 'Kia', model: 'EV9 GT-Line', outline: 'EV9',
-    year: 2024, hp: 385, seats: 6, km: 0, type: 'ev',
-    engine: { uz: 'Elektr · 99.8 kVt·soat · AWD', ru: 'Электро · 99.8 кВт·ч · AWD' },
-    color: { uz: 'Toʻq koʻk metallik', ru: 'Тёмно-синий металлик' },
-    note: { uz: '6 oʻrindiq, aylanuvchi kreslolar', ru: '6 мест, поворотные кресла' },
-    paint: 'navy', paintRe: /^CarPaint$/,
-    // orqa oynadagi isitish simlari siqishda qalin to'q sariq chiziqlarga aylangan
-    creaseNormals: 60, hideRe: /^OragneCh$/,
-  },
-  {
     id: 'g63', brand: 'Mercedes-AMG', model: 'G 63', outline: 'G 63',
     year: 2024, hp: 585, seats: 5, km: 0, type: 'suv',
     engine: { uz: '4.0 V8 Biturbo', ru: '4.0 V8 Biturbo' },
@@ -108,7 +98,7 @@ export const byId = (id) => CARS.find((c) => c.id === id);
 // Garajdagi tartib — chapdan o'ngga (src/three/garage.js → G.slots bilan bir xil sonda).
 // Markazdagilari birinchi yuklanadi, chetdagilari sayt ochilgandan keyin qo'shiladi.
 export const GARAGE = [
-  'ev9', 'sportage', 'escalade', 'maybach', 'g63w', 'g63',
+  'sportage', 'escalade', 'maybach', 'g63w', 'g63',
   'urus', 'sportageb', 'ghost', 'rrsport', 'x6',
 ].map(byId);
 // sayt ochilganda tanlangan mashina
