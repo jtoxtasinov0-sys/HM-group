@@ -606,6 +606,8 @@ async function boot() {
   setTimeout(() => {
     loader.classList.add('is-done');
     document.body.classList.add('is-ready');
+    // garajdagi mashinalar darvoza ortidan birin-ketin chiqadi (kirish animatsiyasi bo'lmasa — darhol turadi)
+    if (world?.story) world.startReveal(world.intro > 0);
     playIntro();
     handoffLogo(() => {
       document.body.classList.remove('is-loading');

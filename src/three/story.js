@@ -387,9 +387,12 @@ export function createStory(world) {
         // qo'shnilar 4 m narida, aylansa ularga kirib ketadi (0..0.5 rad oralig'i xavfsiz)
         const face = Math.sign(e.slot.yaw) * (0.12 + 0.1 * Math.sin(time * 0.7 + i)) - e.slot.yaw;
         e.spinAngle = damp(e.spinAngle, target ? face : 0, target || heroLive ? 2.4 : isSel ? 14 : 5, dt);
-        // fonda yuklangan mashina paydo bo'ladi: platformada kichik burilish bilan o'sib chiqadi, halqa yonadi
-        if (e.appear < 1) e.appear = Math.min(1, e.appear + dt / 0.9);
-        const ap = 1 - Math.pow(1 - e.appear, 3);
+        // mashina navbati kelganda paydo bo'ladi (world.reveal): platformada kichik burilish bilan o'sib chiqadi,
+        // halqa yonadi. Navbatgacha yashirin — bo'sh platforma oddiy turadi
+        const shown = time >= e.revealAt;
+        if (e.model) e.model.visible = e.shadow.visible = shown;
+        if (shown && e.appear < 1) e.appear = Math.min(1, e.appear + dt / 0.9);
+        const ap = shown ? 1 - Math.pow(1 - e.appear, 3) : 1;
         e.spin.rotation.y = e.spinAngle + 0.8 * (1 - ap);
         e.lift.scale.setScalar((1 + 0.12 * h) * (0.86 + 0.14 * ap));
         e.lift.position.y = 0.05 * h;
