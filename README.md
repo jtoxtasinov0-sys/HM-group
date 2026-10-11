@@ -5,7 +5,8 @@
 Skroll orqali hikoya qiluvchi premium sayt:
 
 0. **Kirish**: yuklovchi — garaj darvozasi: tayyor bo'lgach tepaga ko'tariladi, ortidan qorong'i garaj ochiladi,
-   chiroqlar asta yonadi va kamera yuqoridan / uzoqdan garajga kirib keladi; HM belgisi header'ga uchib boradi,
+   chiroqlar asta yonadi va kamera yuqoridan / uzoqdan garajga kirib keladi, mashinalar markazdan chetga
+   birin-ketin platformalarda paydo bo'ladi; HM belgisi header'ga uchib boradi,
    sarlavha so'zlari niqobdan ko'tariladi, urg'u qatori bo'ylab yorug'lik o'tadi.
 1. **Garaj**: oq dumaloq showroom (shiftda katta yorug' doira), 11 ta mashina bir qatorda oq platformalarda
    (qora rezina halqa bilan) turadi. Sichqoncha mashina ustiga borsa, mashina kattalashadi va tomoshabinga qarab
@@ -113,10 +114,12 @@ geometriya soddalashtirildi, meshopt bilan siqildi, teksturalar WebP ga o'tkazil
 
 Kompyuterda garajdagi barcha mashinalar va kema yuklanadi (~38 MB). Telefonda (portret) kadrda bir vaqtda 2–3 ta
 mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~15 MB),
-qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Sayt tez ochilishi uchun faqat birinchi
-kadrda kerakli modellar kutiladi: kompyuterda markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB), telefonda —
-tanlangan mashina (G 63, ~3.4 MB). Qolganlari markazdan chetga tartibda, bir vaqtda 2 tadan fonda
-yuklanadi va platformada silliq paydo bo'ladi; kema oxirida (foydalanuvchi skrollni boshlasa — oldinroq).
+qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Modellar markazdan chetga
+tartibda, bir vaqtda 2 tadan yuklanadi. Kompyuterda yuklovchi garajdagi hamma mashinalarni (~35 MB) kutadi, lekin
+ko'pi bilan 7 soniya (`WAIT_ALL`): internet sekin bo'lsa sayt markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB) bilan
+ochiladi. Telefonda faqat tanlangan mashina (G 63, ~3.4 MB) kutiladi. Darvoza ko'tarilgach tayyor mashinalar
+markazdan chetga birin-ketin paydo bo'ladi (`REVEAL_DELAY`, `REVEAL_STEP` — `world.js`); keyin yuklanganlari
+kelishi bilan shu navbat oxiriga qo'shiladi. Kema oxirida yuklanadi (foydalanuvchi skrollni boshlasa — oldinroq).
 Sichqoncha borgan / tanlangan mashina navbatda oldinga o'tadi. Bir model bir necha
 rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`).
 

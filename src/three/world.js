@@ -100,6 +100,11 @@ const HIGHPASS_FRAG = /* glsl */`
 
 const PIXEL_BUDGET = 3.6e6; // ~2560x1400: undan katta kadr GPU xotirasini to'ldirib, kontekstni yo'qotishi mumkin
 const NEAR = 2; // telefonda: tanlangan mashinaning har ikki tomonidan nechtasi oldindan yuklanadi
+// Kompyuterda yuklovchi hamma mashinalarni kutadi (sayt ochilganda garaj to'liq bo'lsin), lekin ko'pi bilan
+// shuncha ms: internet sekin bo'lsa sayt markazdagi mashinalar bilan ochiladi, qolganlari kelishi bilan chiqadi
+const WAIT_ALL = 7000;
+// Paydo bo'lish navbati (s): darvoza ko'tarilib mashinalar ko'ringach boshlanadi, keyingisi STEP dan keyin
+const REVEAL_DELAY = 0.7, REVEAL_STEP = 0.12;
 
 export function detectQuality() {
   const coarse = matchMedia('(pointer: coarse)').matches;
@@ -179,6 +184,9 @@ export class World {
     // kirish animatsiyasi (1 → 0): kamera uzoqdan va yuqoridan kirib keladi, garaj chiroqlari yonadi (main.js)
     this.intro = 0;
     this.frame = 0;
+    // mashinalarning paydo bo'lish navbati (startReveal): navbatdagi mashina qachondan chiqishi mumkin (this.time)
+    this.revealing = false;
+    this.revealNext = 0;
   }
 
   on(type, fn) { this.listeners[type].add(fn); return () => this.listeners[type].delete(fn); }
@@ -255,7 +263,7 @@ export class World {
       document.body.classList.remove('gl-lost');
     });
 
-    // yuklash: sayt birinchi ko'rinadigan mashina(lar) bilan ochiladi, qolganlari fonda qo'shiladi
+    // yuklash: kompyuterda — hamma mashinalar (WAIT_ALL gacha), telefonda — birinchi ko'rinadigani; qolganlari fonda
     await this.mountFirst();
 
     this.story = createStory(this);
@@ -263,8 +271,10 @@ export class World {
     this.bindEvents();
     this.resize();
     this.selectCar(this.selected, true);
-    // garaj shaderlari sayt ochilishidan oldin tayyorlanadi — birinchi kadrlar qotmaydi
+    // garaj shaderlari va mashina teksturalari sayt ochilishidan oldin tayyorlanadi: mashinalar paydo bo'lguncha
+    // yashirin turadi, aks holda ular birinchi chizilgan kadrda (navbat bilan chiqayotganda) qotish bo'lardi
     await this.precompile('garage');
+    await this.uploadTextures(this.fleet);
     renderer.setAnimationLoop(() => this.tick());
     this.mountRest();
   }
@@ -459,9 +469,11 @@ export class World {
     if (!this.lazy) enqueue('ship'); // telefonda kema hikoyaga kirilganda so'raladi (tick → prioritize)
 
     this.load = {
-      fileOf, order, jobs,
-      // sayt ochilishi uchun kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
+      fileOf, order, jobs, t0: performance.now(),
+      // sayt ochilishi uchun albatta kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
       need: files.slice(0, narrow ? 1 : 2),
+      // yuklovchi kutadiganlari: kompyuterda — hamma mashinalar (WAIT_ALL gacha), telefonda — faqat kerakligi
+      want: this.quality.mobile ? files.slice(0, narrow ? 1 : 2) : files,
       get: (f) => enqueue(f).promise,
       /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi (navbatda bo'lmasa — qo'shiladi) */
       prioritize: (f) => {
@@ -474,7 +486,7 @@ export class World {
 
   /** Joylarni modelsiz quradi va birinchi ko'rinadigan mashinalarni joylaydi (shu bilan sayt ochiladi) */
   async mountFirst() {
-    const { fileOf, need, jobs } = this.load;
+    const { fileOf, need, want, jobs } = this.load;
     const bytesOf = (f) => this.manifest[f]?.bytes || 3e6;
 
     const shadowTex = makeShadowTexture();
@@ -509,7 +521,7 @@ export class World {
       const rig = { front: size.z * 0.3, back: -size.z * 0.3, body: new THREE.Group(), roll() {}, steer() {} };
       return {
         car, model: null, mats: [], root, lift, spin, shadow, hit, size, slot, rig,
-        hover: 0, spinAngle: 0, dim: 1, appear: 1,
+        hover: 0, spinAngle: 0, dim: 1, appear: 0, revealAt: Infinity, // navbati kelguncha yashirin (reveal)
         turntable: this.garage.anim.turntables[i],
       };
     });
@@ -520,17 +532,26 @@ export class World {
     for (const e of this.entities) uses.set(fileOf(e.car), (uses.get(fileOf(e.car)) || 0) + 1);
     this.load.uses = uses;
 
-    // yuklash foizi — faqat sayt ochilishi uchun kerakli fayllar bo'yicha
-    const total = need.reduce((sum, f) => sum + bytesOf(f), 0);
-    const got = Object.fromEntries(need.map((f) => [f, 0]));
+    // yuklash foizi — yuklovchi kutadigan fayllar bo'yicha
+    const total = want.reduce((sum, f) => sum + bytesOf(f), 0);
+    const got = Object.fromEntries(want.map((f) => [f, 0]));
     const report = (f, n) => {
       got[f] = Math.min(n, bytesOf(f));
       this.onProgress?.(Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
     };
-    for (const f of need) jobs.get(f).onBytes = report;
+    for (const f of want) jobs.get(f).onBytes = report;
 
-    const first = this.entities.filter((e) => need.includes(fileOf(e.car)));
-    await Promise.all(first.map(async (e) => this.mount(e, await this.load.get(fileOf(e.car)), false)));
+    // fayl kelishi bilan mashina joyiga qo'yiladi (yashirin — sayt ochilgach navbat bilan chiqadi: startReveal).
+    // Muddat o'tgach kelganlari bu yerda emas, fonda qo'yiladi (mountRest)
+    let open = false;
+    const put = async (e) => { const g = await this.load.get(fileOf(e.car)); if (!open) this.mount(e, g, false); };
+    const first = this.entities.filter((e) => want.includes(fileOf(e.car)));
+    const core = first.filter((e) => need.includes(fileOf(e.car)));
+    const rest = first.filter((e) => !core.includes(e)).map((e) => put(e).catch((err) => console.warn('car load failed', e.car.id, err)));
+    await Promise.all(core.map(put));
+    const left = WAIT_ALL - (performance.now() - this.load.t0);
+    await Promise.race([Promise.all(rest), new Promise((r) => setTimeout(r, Math.max(0, left)))]);
+    open = true;
   }
 
   /** Modelni joyiga qo'yadi. background — sayt ochiq: ish bo'laklarga bo'linadi, mashina silliq paydo bo'ladi */
@@ -551,9 +572,30 @@ export class World {
       await this.uploadTextures(model);
     }
     e.spin.add(model);
-    e.shadow.visible = true;
-    Object.assign(e, { model, rig, mats, dim: 1, appear: background ? 0 : 1 });
+    Object.assign(e, { model, rig, mats, dim: 1 });
     this.mounted++;
+    if (this.revealing) this.reveal(e);
+  }
+
+  /**
+   * Sayt ochildi: tayyor mashinalar birin-ketin paydo bo'ladi — markazdan chetga (yuklash tartibida, load.order).
+   * stagger = false (kirish animatsiyasi yo'q) — darhol turadi. Keyin yuklanganlari kelishi bilan navbat oxiriga qo'shiladi
+   */
+  startReveal(stagger) {
+    this.revealing = true;
+    this.revealNext = this.time + (stagger ? REVEAL_DELAY : 0);
+    for (const i of this.load.order) {
+      const e = this.entities[i];
+      if (!e.model || e.revealAt !== Infinity) continue;
+      if (stagger) this.reveal(e);
+      else Object.assign(e, { revealAt: -Infinity, appear: 1 });
+    }
+  }
+
+  /** Mashinani paydo bo'lish navbatiga qo'yadi: oldingisidan kamida REVEAL_STEP keyin chiqadi (story.js) */
+  reveal(e) {
+    e.revealAt = Math.max(this.time, this.revealNext);
+    this.revealNext = e.revealAt + REVEAL_STEP;
   }
 
   /** Mashinani fonda yuklab joyiga qo'yadi (bir marta) */
@@ -655,7 +697,8 @@ export class World {
   pick() {
     if (this.pointer.x > 2) return -1;
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hit = this.raycaster.intersectObjects(this.hitboxes, false)[0];
+    // hali paydo bo'lmagan mashina joyi tanlanmaydi
+    const hit = this.raycaster.intersectObjects(this.hitboxes, false).find((h) => this.time >= this.entities[h.object.userData.index].revealAt);
     return hit ? hit.object.userData.index : -1;
   }
 

@@ -80,10 +80,10 @@ export const STOCK = [
 
 // Obzor videolari (Instagram Reels) — «Obzorlar» bo'limi
 export const REELS = [
-  { id: 'DTNWGIZko-m', title: { uz: 'BMW 740i va Mercedes-AMG G 63 — mini-obzor', ru: 'BMW 740i и Mercedes-AMG G 63 — мини-обзор' } },
-  { id: 'DYi_R_rplIA', title: { uz: 'Mercedes-Benz GLS 450 — toʻliq komplektatsiya', ru: 'Mercedes-Benz GLS 450 — полная комплектация' } },
+  { id: 'DTNWGIZko-m', title: { uz: 'BMW 740i va Mercedes-AMG G 63\u00a0– mini-obzor', ru: 'BMW 740i и Mercedes-AMG G 63\u00a0– мини-обзор' } },
+  { id: 'DYi_R_rplIA', title: { uz: 'Mercedes-Benz GLS 450\u00a0– toʻliq komplektatsiya', ru: 'Mercedes-Benz GLS 450\u00a0– полная комплектация' } },
   { id: 'DYMBIUsJLRT', title: { uz: 'Mercedes-AMG G 63', ru: 'Mercedes-AMG G 63' } },
-  { id: 'DX63AbFJ_U3', title: { uz: 'Mercedes-Benz E 300 AMG — 140 yillik', ru: 'Mercedes-Benz E 300 AMG — 140 лет' } },
+  { id: 'DX63AbFJ_U3', title: { uz: 'Mercedes-Benz E 300 AMG\u00a0– 140 yillik', ru: 'Mercedes-Benz E 300 AMG\u00a0– 140 лет' } },
   { id: 'DWYvFwZCSps', title: { uz: 'Mercedes-AMG GT 63 S Performance', ru: 'Mercedes-AMG GT 63 S Performance' } },
   { id: 'DUpvHsvjAGi', title: { uz: 'Mercedes-AMG GT 63 E Performance', ru: 'Mercedes-AMG GT 63 E Performance' } },
   { id: 'Dd_o381p09S', title: { uz: 'Mercedes-Benz S 450 L AMG', ru: 'Mercedes-Benz S 450 L AMG' } },
