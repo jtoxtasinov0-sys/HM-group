@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G } from './garage.js';
 import { C } from './container.js';
-import { P } from './port.js';
+import { P, SHIP_BASE } from './port.js';
 
 // ---------- yordamchilar ----------
 export const clamp01 = (x) => Math.min(1, Math.max(0, x));
@@ -45,11 +45,13 @@ export const FOG_NEAR = 70, FOG_FAR = 340;
 export const PORT_HAZE = new THREE.Color('#d3e1ef');  // dengiz ufqidagi havo
 
 export function createStory(world) {
-  const { camera, garage, port, container, spreader } = world;
+  // port va konteyner sayt ochilgandan keyin quriladi (world.buildRest) — ular har kadrda world'dan olinadi
+  const { camera, garage, spreader } = world;
   const ents = world.entities;
   const A = garage.anim;
 
-  const shipBase = port.shipHolder.position.clone();
+  const shipBase = SHIP_BASE.clone();
+  const shipPos = new THREE.Vector3();
   const slot = shipBase.clone().add(P.slotLocal); // kemadagi joy
   const slotLocal = new THREE.Vector3();
   const updateSlotLocal = () => slotLocal.copy(slot).sub(shipBase);
@@ -295,14 +297,19 @@ export function createStory(world) {
 
   // ---------- har kadr ----------
   function update(p, dt, time) {
+    const { port, container } = world;
     // kema harakati: prichalda arqonlar bilan bog'langan — deyarli qimirlamaydi (ingichka panjaralar
     // "jimirlamaydi"), ochiq suvga chiqqach chayqalish biroz kuchayadi
     const sail = seg(p, T.sailA, T.sailB);
-    const ship = port.shipHolder;
     const sway = 0.35 + 0.65 * smooth(0.15, 0.6, sail);
-    ship.position.set(shipBase.x + 6 * sail * sail, shipBase.y + Math.sin(time * 0.6) * 0.06 * sway, shipBase.z + 200 * Math.pow(sail, 1.6));
-    ship.rotation.z = Math.sin(time * 0.45) * 0.005 * sway;
-    ship.rotation.x = Math.sin(time * 0.33 + 1) * 0.0025 * sway;
+    shipPos.set(shipBase.x + 6 * sail * sail, shipBase.y + Math.sin(time * 0.6) * 0.06 * sway, shipBase.z + 200 * Math.pow(sail, 1.6));
+    const shipRz = Math.sin(time * 0.45) * 0.005 * sway;
+    const shipRx = Math.sin(time * 0.33 + 1) * 0.0025 * sway;
+    if (port) {
+      port.shipHolder.position.copy(shipPos);
+      port.shipHolder.rotation.z = shipRz;
+      port.shipHolder.rotation.x = shipRx;
+    }
 
     // --- konteyner holati ---
     // nishon — kemadagi uyacha, kema bilan birga chayqaladi: tushayotganda ham unga ergashadi,
@@ -313,31 +320,35 @@ export function createStory(world) {
       const lift = easeSine(seg(p, T.liftA, T.liftB));
       const mx = ease(seg(p, T.moveXA, T.moveXB));
       low = ease(seg(p, T.lowerA, T.lowerB));
-      tmpA.copy(ship.position).add(slotLocal);
+      tmpA.copy(shipPos).add(slotLocal);
       contPos.set(lerp(0, tmpA.x, mx), lerp(lift * LIFT_TOP, tmpA.y, low), lerp(G.container.z, tmpA.z, mx));
     }
-    container.group.position.copy(contPos);
-    container.group.rotation.set(ship.rotation.x * low, 0, ship.rotation.z * low);
 
     // eshiklar va ichki chiroq
     const closeL = ease(seg(p, T.closeA, T.closeA + 0.035));
     const closeR = ease(seg(p, T.closeA + 0.015, T.closeB));
-    container.setDoors(1 - closeL, 1 - closeR);
-    container.setInnerLight(seg(p, T.shutA, T.shutB) * (1 - seg(p, T.closeB - 0.01, T.closeB + 0.01)));
+    if (container) {
+      container.group.position.copy(contPos);
+      container.group.rotation.set(shipRx * low, 0, shipRz * low);
+      container.setDoors(1 - closeL, 1 - closeR);
+      container.setInnerLight(seg(p, T.shutA, T.shutB) * (1 - seg(p, T.closeB - 0.01, T.closeB + 0.01)));
+    }
 
     // --- spreader / kran ---
     const spreadVis = p > T.spreadA - 0.005 && p < T.releaseB + 0.01;
     world.spreaderOn = spreadVis; // spreader faqat port kadrida chiziladi
-    if (spreadVis) {
-      const down = ease(seg(p, T.spreadA, T.spreadB));
-      const up = ease(seg(p, T.releaseA, T.releaseB));
-      const sy = contPos.y + C.H + (1 - down) * 14 + up * 18;
-      spreader.group.position.set(contPos.x, sy, contPos.z);
-      spreader.setTop(port.crane.ropeTop);
+    if (port) {
+      if (spreadVis) {
+        const down = ease(seg(p, T.spreadA, T.spreadB));
+        const up = ease(seg(p, T.releaseA, T.releaseB));
+        const sy = contPos.y + C.H + (1 - down) * 14 + up * 18;
+        spreader.group.position.set(contPos.x, sy, contPos.z);
+        spreader.setTop(port.crane.ropeTop);
+      }
+      port.crane.trolley.position.x = spreadVis ? contPos.x : port.crane.trolley.position.x;
+      // kran relslar bo'ylab konteyner bilan birga siljiydi (kemadagi joy biroz boshqa z da)
+      port.crane.group.position.z = (slot.z - G.container.z) * ease(seg(p, T.moveXA, T.moveXB));
     }
-    port.crane.trolley.position.x = spreadVis ? contPos.x : port.crane.trolley.position.x;
-    // kran relslar bo'ylab konteyner bilan birga siljiydi (kemadagi joy biroz boshqa z da)
-    port.crane.group.position.z = (slot.z - G.container.z) * ease(seg(p, T.moveXA, T.moveXB));
 
     // --- dunyolar: garaj/hovli → port (world.render ikkalasini kerakli ulushda chizadi) ---
     const blend = easeSine(seg(p, T.xfadeA, T.xfadeB));
@@ -425,8 +436,8 @@ export function createStory(world) {
     }
 
     // --- port ---
-    if (portOn) {
-      port.wake.update(ship.position.x, ship.position.z + port.sternZ, shipBase.z + port.sternZ, seg(p, T.sailA, T.sailA + 0.08));
+    if (portOn && port) {
+      port.wake.update(shipPos.x, shipPos.z + port.sternZ, shipBase.z + port.sternZ, seg(p, T.sailA, T.sailA + 0.08));
       // soya kamerasi: konteynerga ergashadi; suzish boshlangach kemaning prichaldagi joyida qotadi
       if (p < T.sailA) shadowFocus.copy(contPos);
       else shadowFocus.copy(slot);

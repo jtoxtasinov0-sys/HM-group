@@ -1,5 +1,7 @@
 import Lenis from 'lenis';
 import { GARAGE, GARAGE_START } from './data/cars.js';
+// 3D modellar ro'yxati (o'lcham, versiya) — yig'ishda JS ichiga qo'shiladi (npm run models yangilaydi)
+import MODELS from '../public/models/manifest.json';
 import { STOCK, REELS, reelUrl } from './data/stock.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
@@ -192,7 +194,7 @@ function syncPreview(v) {
 function renderReels() {
   $('#reels').innerHTML = REELS.map((r, i) => `
     <article class="reel reveal">
-      <video class="reel__video" src="${reelSrc(r.id, '-preview.mp4')}" poster="${reelSrc(r.id, '.webp')}" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true"></video>
+      <video class="reel__video" src="${reelSrc(r.id, '-preview.mp4')}" data-poster="${reelSrc(r.id, '.webp')}" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true"></video>
       <span class="reel__muted" aria-hidden="true">${MUTED_ICON}</span>
       <div class="reel__cap">
         <strong class="reel__title"></strong>
@@ -206,6 +208,12 @@ function renderReels() {
     v.muted = true; // avtomatik o'ynash faqat ovozsiz videoga ruxsat etiladi
     if (PREVIEW_AUTOPLAY) previewIO.observe(v);
   });
+  // muqovalar bo'lim ekranga yaqinlashganda yuklanadi: sayt ochilayotganda trafik 3D modelga ketsin
+  new IntersectionObserver(([en], obs) => {
+    if (!en.isIntersecting) return;
+    obs.disconnect();
+    $$('#reels .reel__video').forEach((v) => { v.poster = v.dataset.poster; });
+  }, { rootMargin: '100% 0px' }).observe($('#reels'));
 }
 function updateReels() {
   $$('#reels .reel').forEach((el, i) => {
@@ -558,14 +566,11 @@ const setLoad = (k) => {
 
 async function boot() {
   try {
-    // shrift (canvas yozuvlari uchun) va modellar ro'yxati bir vaqtda; shrift sekin kelsa — uzoq kutilmaydi
-    const font = document.fonts.load('600 100px Inter').catch(() => {});
-    const [manifest] = await Promise.all([
-      fetch(`${BASE}models/manifest.json`, { cache: 'no-cache' }).then((r) => r.json()),
-      Promise.race([font, new Promise((r) => setTimeout(r, 2500))]),
-    ]);
+    // Shrift faqat canvas yozuvlari uchun (konteyner, kran, mashina nomi) — sayt uni kutmaydi, yozuvlar
+    // shrift kelgach chiziladi. Modellar ro'yxati JS ichida (MODELS): alohida so'rov kutilmaydi
+    const fontReady = Promise.race([document.fonts.load('600 100px Inter'), new Promise((r) => setTimeout(r, 4000))]).catch(() => {});
     const quality = detectQuality();
-    world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest, quality, onProgress: setLoad });
+    world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest: MODELS, quality, onProgress: setLoad, fontReady });
     await world.init();
     world.targetP = DEBUG_P !== null ? parseFloat(DEBUG_P) : progressAt(lenis.scroll || scrollY);
     world.p = world.targetP;
@@ -603,16 +608,20 @@ async function boot() {
     setLayer('hero', 1);
   }
   setLoad(1);
+  // chiziq 100% ga yetib ulgursin (u ~96% dan keladi), keyin darvoza ochiladi
   setTimeout(() => {
     loader.classList.add('is-done');
     document.body.classList.add('is-ready');
     // garajdagi mashinalar darvoza ortidan birin-ketin chiqadi (kirish animatsiyasi bo'lmasa — darhol turadi)
-    if (world?.story) world.startReveal(world.intro > 0);
+    if (world?.story) {
+      world.startReveal(world.intro > 0);
+      world.buildRest(); // hovli, konteyner, port — fonda (kirish animatsiyasidan keyin)
+    }
     playIntro();
     handoffLogo(() => {
       document.body.classList.remove('is-loading');
       lenis.start();
     });
-  }, 450);
+  }, 250);
 }
 boot();

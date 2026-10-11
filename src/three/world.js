@@ -6,11 +6,11 @@ import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
 import { createSkyEnvMap } from './sky.js';
 import { createGarage, G } from './garage.js';
-import { createContainer, createSpreader } from './container.js';
-import { createPort } from './port.js';
+import { buildContainer, createContainerLight, createSpreader } from './container.js';
+import { buildPort } from './port.js';
 import { prepareCarMaterials, setCarDim } from './materials.js';
 import { makeShadowTexture, makeOutlineTextTexture } from './textures.js';
-import { createStory, GARAGE_FOG, FOG_NEAR, FOG_FAR, PORT_HAZE } from './story.js';
+import { createStory, T, GARAGE_FOG, FOG_NEAR, FOG_FAR, PORT_HAZE } from './story.js';
 import { rigWheels, rigWheelsAsync } from './wheels.js';
 
 const FS_VERT = /* glsl */`
@@ -100,11 +100,11 @@ const HIGHPASS_FRAG = /* glsl */`
 
 const PIXEL_BUDGET = 3.6e6; // ~2560x1400: undan katta kadr GPU xotirasini to'ldirib, kontekstni yo'qotishi mumkin
 const NEAR = 2; // telefonda: tanlangan mashinaning har ikki tomonidan nechtasi oldindan yuklanadi
-// Kompyuterda yuklovchi hamma mashinalarni kutadi (sayt ochilganda garaj to'liq bo'lsin), lekin ko'pi bilan
-// shuncha ms: internet sekin bo'lsa sayt markazdagi mashinalar bilan ochiladi, qolganlari kelishi bilan chiqadi
-const WAIT_ALL = 7000;
 // Paydo bo'lish navbati (s): darvoza ko'tarilib mashinalar ko'ringach boshlanadi, keyingisi STEP dan keyin
 const REVEAL_DELAY = 0.7, REVEAL_STEP = 0.12;
+// Hovli va konteyner (darvoza ortida) shu progressdan oldin, port — o'tish boshlanishidan oldin albatta tayyor bo'ladi:
+// odatda ular sayt ochilgandan keyin fonda quriladi (buildRest), foydalanuvchi undan tez yetib kelsa — darhol
+const YARD_AT = 0.2;
 
 export function detectQuality() {
   const coarse = matchMedia('(pointer: coarse)').matches;
@@ -134,26 +134,70 @@ function cloneCar(src) {
 }
 
 /**
- * Brauzer bo'sh turgan paytni kutadi (kadrlar orasida). Og'ir ishlar (model tayyorlash, shader, tekstura)
- * shu paytlarga bo'lib qo'yiladi — skroll va animatsiya qotmaydi. Qaytaradi: { timeRemaining() }.
+ * Navbatdagi kadr chizilgach, kadrlar orasidagi bo'lakni kutadi. Og'ir ishlar (model tayyorlash, shader, tekstura)
+ * shunday bo'laklarga bo'lib qo'yiladi — skroll va animatsiya qotmaydi. Qaytaradi: { timeRemaining() } — bo'lakka
+ * ajratilgan vaqt (budget, ms). requestIdleCallback emas: 3D sahna har kadrda chizilganda brauzer deyarli hech qachon
+ * "bo'sh" bo'lmaydi — har bir ish 300 ms kutib qolib, fondagi mashina 10 soniyalab joylanardi
  */
-const idle = (timeout = 300) => new Promise((resolve) => {
-  if (window.requestIdleCallback) requestIdleCallback(resolve, { timeout });
-  else setTimeout(() => { const t = performance.now(); resolve({ timeRemaining: () => Math.max(0, 8 - (performance.now() - t)) }); }, 16);
+const idle = (budget = 8) => new Promise((resolve) => {
+  const run = () => {
+    const t0 = performance.now();
+    resolve({ timeRemaining: () => Math.max(0, budget - (performance.now() - t0)) });
+  };
+  // fon tabida kadr chizilmaydi (requestAnimationFrame to'xtaydi) — ish taymer bilan davom etadi
+  if (document.hidden) setTimeout(run, 0);
+  else requestAnimationFrame(() => setTimeout(run, 0));
 });
 
 /** Asosiy oqimni bir lahzaga bo'shatadi: brauzer kadr chizib oladi, ish darhol davom etadi */
 const yieldTask = () => (globalThis.scheduler?.yield ? globalThis.scheduler.yield() : new Promise((r) => setTimeout(r, 0)));
 
+const SHADOW_SIDE = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
+
+/**
+ * Soya xaritasiga chiziladigan narsalarning chuqurlik shaderlari uchun namuna meshlar (three.js WebGLShadowMap →
+ * getDepthMaterial kabi: tomoni, teksturasi, instancing). renderer.compile ularni tayyorlamaydi — ular birinchi kadrda
+ * sinxron kompilyatsiya bo'lib, GPU navbatidagi boshqa shaderlarni kutib, kadrni soniyalab qotirardi
+ */
+function shadowCasters(root) {
+  const group = new THREE.Group();
+  const seen = new Set();
+  root.traverseVisible((o) => {
+    if (!o.isMesh || !o.castShadow || o.customDepthMaterial) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      const side = m.shadowSide ?? SHADOW_SIDE[m.side];
+      const key = [side, !!m.map, !!m.alphaMap, m.alphaTest > 0, !!o.isInstancedMesh, !!o.instanceColor].join();
+      if (!m.visible || seen.has(key)) continue;
+      seen.add(key);
+      const depth = new THREE.MeshDepthMaterial({ side, map: m.map, alphaMap: m.alphaMap, alphaTest: m.alphaTest });
+      const mesh = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, depth, 1) : new THREE.Mesh(o.geometry, depth);
+      if (o.instanceColor) mesh.instanceColor = o.instanceColor;
+      group.add(mesh);
+    }
+  });
+  return group;
+}
+
 let meshoptWorkers = false;
 
 export class World {
-  constructor(canvas, { cars, start = 0, manifest, quality, onProgress }) {
+  constructor(canvas, { cars, start = 0, manifest, quality, onProgress, fontReady }) {
     this.canvas = canvas;
     this.cars = cars; // garajdagi mashinalar, joylar tartibida (G.slots)
     this.manifest = manifest;
     this.quality = quality;
     this.onProgress = onProgress;
+    // Inter shrifti yuklandi (canvas yozuvlari: konteyner, kran, mashina nomi) — sayt ochilishi uni kutmaydi.
+    // Mashina nomi shriftdan oldin chizilgan bo'lsa (zaxira shrift bilan) — shrift kelgach qayta chiziladi
+    this.fontReady = Promise.resolve(fontReady).catch(() => {}).then(() => {
+      this.fontLoaded = true;
+      if (this.outlineFallback) this.outlineDirty = true;
+    });
+    // sayt ochilgandan keyin quriladi (buildRest)
+    this.port = null;
+    this.container = null;
+    this.portReady = new Promise((resolve) => { this.resolvePort = resolve; });
+    this.loading = true; // yuklovchi ko'rinib turibdi (init tugaguncha)
     this.p = 0;
     this.pVel = 0; // hikoya progressining tezligi (1/s) — tick
     this.targetP = 0;
@@ -214,13 +258,11 @@ export class World {
     camera.position.set(0, 3.7, 21);
     this.camera = camera;
 
-    // dunyolar
+    // dunyolar: sayt ochilishi uchun faqat garaj ichi kerak. Hovli (darvoza ortida), konteyner va port faqat skroll
+    // qilinganda ko'rinadi — ular sayt ochilgandan keyin fonda quriladi (buildRest): ularning teksturalari va
+    // geometriyasi ochilishni kompyuterda ~1 s, telefonda bir necha soniya kechiktirardi
     this.garage = createGarage({ quality });
     scene.add(this.garage.group);
-    this.port = createPort({ quality });
-    this.skyUniforms = this.port.sky.uniforms;
-    this.port.group.visible = false;
-    scene.add(this.port.group);
 
     // har bir dunyoning o'z havosi (tuman), foni va muhit xaritasi
     this.worlds = {
@@ -231,17 +273,21 @@ export class World {
     this.fleet = new THREE.Group(); // garajdagi mashinalar
     scene.add(this.fleet);
 
-    this.container = createContainer();
-    this.container.group.position.copy(G.container);
-    scene.add(this.container.group);
+    // Konteyner ichidagi chiroq sahnada boshidan turadi (konteyner keyin quriladi va uni o'ziga oladi): shaderlar
+    // chiroqlar soniga bog'liq — chiroq keyin qo'shilsa, garajdagi barcha materiallar qaytadan kompilyatsiya bo'lardi
+    this.containerLight = createContainerLight();
+    this.containerLight.position.add(G.container);
+    scene.add(this.containerLight);
     this.spreader = createSpreader();
     this.spreader.group.visible = false;
     scene.add(this.spreader.group);
 
     // mashina orqasidagi katta nom
+    // teksturasi (nom) keyin chiziladi (buildOutline); bo'sh tekstura bilan shader boshidan "teksturali" tayyorlanadi —
+    // nom paydo bo'lganda qaytadan kompilyatsiya bo'lib, skroll qotmaydi
     this.outline = new THREE.Mesh(
       new THREE.PlaneGeometry(15, 3.75),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, color: new THREE.Color('#1D3E69'), toneMapped: false }),
+      new THREE.MeshBasicMaterial({ map: new THREE.Texture(), transparent: true, opacity: 0, depthWrite: false, color: new THREE.Color('#1D3E69'), toneMapped: false }),
     );
     this.outline.position.set(0, 2.55, -3.9);
     this.garage.group.add(this.outline);
@@ -264,7 +310,17 @@ export class World {
       document.body.classList.remove('gl-lost');
     });
 
-    // yuklash: kompyuterda — hamma mashinalar (WAIT_ALL gacha), telefonda — birinchi ko'rinadigani; qolganlari fonda
+    // Garajning birinchi kadri uchun hamma narsa (shaderlar, soya xaritasi, yakuniy kadr, teksturalar) mashina modeli
+    // yuklanayotgan paytda tayyorlanadi — GPU va tarmoq bir vaqtda. Aks holda birinchi kadr ularni sinxron kutib,
+    // GPU navbatida mashina shaderlari ortida qolib ketardi (birinchi tashrifda ~2 s)
+    this.createSlots();
+    const garageReady = Promise.all([
+      this.precompile('garage'),
+      this.precompilePost([this.final]),
+      this.uploadTextures(this.garage.group, this.fleet),
+    ]);
+
+    // yuklash: tanlangan mashina (sayt shu bilan ochiladi); qolganlari fonda, kelishi bilan navbat bilan chiqadi
     await this.mountFirst();
 
     this.story = createStory(this);
@@ -272,26 +328,90 @@ export class World {
     this.bindEvents();
     this.resize();
     this.selectCar(this.selected, true);
-    // garaj shaderlari va mashina teksturalari sayt ochilishidan oldin tayyorlanadi: mashinalar paydo bo'lguncha
-    // yashirin turadi, aks holda ular birinchi chizilgan kadrda (navbat bilan chiqayotganda) qotish bo'lardi
-    await this.precompile('garage');
-    await this.uploadTextures(this.fleet);
+    this.onProgress?.(0.9);
+    // Garaj ichi ochilishdan oldin albatta tayyor bo'ladi (u darhol ko'rinadi). Tanlangan mashinaning shaderlari
+    // kutilmaydi: birinchi tashrifda (shader keshi bo'sh) ular 1–2 s kompilyatsiya bo'ladi, mashina esa baribir
+    // darvoza ochilgach (REVEAL_DELAY) chiqadi — u tayyor bo'lishi bilan paydo bo'ladi (mount)
+    await garageReady;
+    this.onProgress?.(0.96);
+    this.loading = false;
     renderer.setAnimationLoop(() => this.tick());
     this.mountRest();
   }
 
-  /** Fondagi og'ir ishni navbatga qo'yadi: ishlar bir-birining ustiga tushmaydi */
-  later(job) {
-    this.work = this.work.then(() => this.afterIntro()).then(job).catch((e) => console.warn(e));
+  /** Fondagi og'ir ishni navbatga qo'yadi: ishlar bir-birining ustiga tushmaydi. intro — kirish animatsiyasini kutish */
+  later(job, intro = true) {
+    this.work = this.work.then(() => (intro ? this.afterIntro() : null)).then(job).catch((e) => console.warn(e));
     return this.work;
   }
 
-  /** Kirish animatsiyasi (kamera, chiroqlar) paytida og'ir ishlar kutib turadi — u qotmasdan, silliq o'tsin */
+  /**
+   * Kirish animatsiyasi (kamera, chiroqlar) paytida og'ir ishlar kutib turadi — u qotmasdan, silliq o'tsin.
+   * Foydalanuvchi hikoyani skroll qila boshlasa — kutilmaydi: keyingi sahnalar tayyor bo'lishi muhimroq
+   */
   afterIntro() {
     return new Promise((resolve) => {
-      const check = () => (this.intro <= 0.12 ? resolve() : setTimeout(check, 120));
+      const check = () => (this.intro <= 0.12 || this.targetP > 0.02 ? resolve() : setTimeout(check, 120));
       check();
     });
+  }
+
+  /**
+   * Sayt ochilgandan keyin (main.js chaqiradi) fonda, kadrlar orasida bo'laklab: hovli, konteyner, keyin port va
+   * uning shaderlari. Foydalanuvchi ularga undan oldin yetib kelsa — tick() darhol quradi (ensureYard, ensurePort)
+   */
+  async buildRest() {
+    try {
+      await this.afterIntro();
+      await this.fontReady; // konteyner va kran yozuvlari (canvas) Inter shriftida chiziladi
+      while (!this.stepYard()) await idle();
+      while (!this.stepContainer()) await idle();
+      await this.precompile('garage');
+      await this.uploadTextures(this.garage.group, this.container.group);
+      // port — skroll to'xtagan paytda (yoki foydalanuvchi darvozadan o'tsa — kutmasdan)
+      await this.calm(700, 0.3);
+      while (!this.stepPort()) await idle();
+      await this.later(() => this.warmPort());
+    } catch (e) { console.warn(e); }
+  }
+
+  /** Hovlining (darvoza ortidagi maydon) keyingi bo'lagi; hammasi qurilgan bo'lsa — true */
+  stepYard() { return this.garage.anim.buildYard(); }
+  ensureYard() { while (!this.stepYard()); }
+
+  /** HM konteynerining keyingi bo'lagi (container.js → buildContainer); oxirgisi uni sahnaga qo'shadi */
+  stepContainer() {
+    if (this.container) return true;
+    this.containerSteps ??= buildContainer({ light: this.containerLight });
+    const r = this.containerSteps.next();
+    if (!r.done) return false;
+    r.value.group.position.copy(G.container);
+    this.scene.add(r.value.group); // ichki chiroq shu zahoti sahnaga qaytadi (o'sha vazifa ichida)
+    this.container = r.value;
+    return true;
+  }
+  ensureContainer() { while (!this.stepContainer()); }
+
+  /** Portning keyingi bo'lagi (port.js → buildPort); oxirgisi portni sahnaga qo'shadi */
+  stepPort() {
+    if (this.port) return true;
+    this.portSteps ??= buildPort({ quality: this.quality });
+    const r = this.portSteps.next();
+    if (!r.done) return false;
+    r.value.group.visible = false; // setWorld boshqaradi
+    this.scene.add(r.value.group);
+    this.port = r.value;
+    this.buildPortEnv();
+    this.resolvePort();
+    return true;
+  }
+
+  /** Port hozir kerak (o'tish boshlanmoqda): fonda qurilib ulgurmagan bo'lsa — qolgani darhol */
+  ensurePort() {
+    if (this.port) return;
+    this.ensureYard();
+    this.ensureContainer();
+    while (!this.stepPort());
   }
 
   /**
@@ -302,26 +422,53 @@ export class World {
   precompile(name, object = null) {
     const { renderer, scene, camera } = this;
     const inPort = name === 'port';
-    const skip = inPort ? [this.garage.group, this.fleet] : [this.port.group, this.spreader.group];
+    const skip = inPort ? [this.garage.group, this.fleet] : [this.port?.group, this.spreader.group];
     const was = this.blend >= 1 ? 'port' : 'garage';
     const target = renderer.getRenderTarget();
     const kids = scene.children;
     this.setWorld(name);
     scene.children = kids.filter((o) => !skip.includes(o)); // faqat bir lahzaga (kompilyatsiya sinxron boshlanadi)
     renderer.setRenderTarget(this.rtScene);
-    let ready;
+    const ready = [];
+    const fog = scene.fog;
     try {
-      ready = object ? renderer.compileAsync(object, camera, scene) : renderer.compileAsync(scene, camera);
+      ready.push(object ? renderer.compileAsync(object, camera, scene) : renderer.compileAsync(scene, camera));
+      // soya xaritasi shaderlari: u ham render target'ga (rang fazosi, tone mapping bir xil), lekin tumansiz chiziladi
+      if (this.quality.shadows) {
+        scene.fog = null;
+        ready.push(renderer.compileAsync(shadowCasters(object || scene), camera, scene));
+      }
     } finally {
+      scene.fog = fog;
       scene.children = kids;
       renderer.setRenderTarget(target);
       this.setWorld(was);
     }
     // kontekst yo'qolsa dastur hech qachon "tayyor" bo'lmaydi — kutish cheklanadi
+    return Promise.race([Promise.all(ready), new Promise((r) => setTimeout(r, 8000))]);
+  }
+
+  /**
+   * To'liq ekranli shaderlar (yakuniy kadr: tone mapping; portda — o'tish va bloom) — ular ham oldindan, aks holda
+   * birinchi ishlatilgan kadrda sinxron kompilyatsiya bo'lardi. Bloom render target'larga chiziladi
+   */
+  precompilePost(materials) {
+    const { renderer } = this;
+    const group = new THREE.Group();
+    this.postGeo ??= new THREE.PlaneGeometry(2, 2);
+    for (const m of materials) group.add(new THREE.Mesh(this.postGeo, m));
+    const target = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.rtScene);
+    let ready;
+    try {
+      ready = renderer.compileAsync(group, this.camera);
+    } finally {
+      renderer.setRenderTarget(target);
+    }
     return Promise.race([ready, new Promise((r) => setTimeout(r, 8000))]);
   }
 
-  /** Teksturalarni GPU'ga birinchi kadrda emas, bo'sh paytlarda oldindan yuklaydi */
+  /** Teksturalarni GPU'ga birinchi kadrda emas, kadrlar orasida oldindan yuklaydi */
   async uploadTextures(...roots) {
     const list = new Set();
     for (const root of roots) root.traverse((o) => {
@@ -332,30 +479,40 @@ export class World {
     });
     let d = null;
     for (const t of list) {
-      // har bo'sh paytda kamida bitta tekstura, vaqt qolsa — yana
-      if (!d || d.timeRemaining() < 4) d = await idle();
+      // har bo'lakda kamida bitta tekstura, vaqt qolsa — yana. Yuklovchi ko'rinib turganda bo'laklar katta
+      if (!d || d.timeRemaining() < 3) d = await idle(this.loading ? 40 : 8);
       if (this.contextLost) return;
       this.uploaded.add(t);
       this.renderer.initTexture(t);
-      if (d.didTimeout) d = null;
     }
   }
 
   /** Port dunyosini (kran, kema, okean) oldindan tayyorlash — hikoyaning o'rtasida kadr qotmasin */
   async warmPort() {
+    this.ensurePort();
     await idle();
-    await this.precompile('port');
+    const { bloom } = this;
+    await Promise.all([
+      this.precompile('port'),
+      // hovli → port o'tishi va bloom shaderlari: avval o'tish boshlanganda kadr qotardi
+      this.precompilePost([this.copyMat, this.blendMat, bloom.materialHighPassFilter, ...bloom.separableBlurMaterials, bloom.compositeMaterial, bloom.blendMaterial]),
+    ]);
     await this.uploadTextures(this.port.group, this.container.group, this.spreader.group);
   }
 
-  /** Osmondan PMREM muhit xaritalari (kontekst tiklanganda qayta quriladi) */
+  /** Osmondan PMREM muhit xaritalari (kontekst tiklanganda qayta quriladi); portniki — port qurilganda */
   buildEnvMaps() {
     this.envYard?.dispose();
-    this.envSky?.dispose();
     // garaj ichi ham hovli osmonidan olingan muhitni aks ettiradi: devorlar ko'kish-kulrang, akslar kontrastli
     this.envYard = createSkyEnvMap(this.renderer, this.garage.anim.yardSky, 0.85);
-    this.envSky = createSkyEnvMap(this.renderer, this.port.sky, 0.9);
     this.worlds.garage.env = this.envYard;
+    this.buildPortEnv();
+  }
+
+  buildPortEnv() {
+    if (!this.port) return;
+    this.envSky?.dispose();
+    this.envSky = createSkyEnvMap(this.renderer, this.port.sky, 0.9);
     this.worlds.port.env = this.envSky;
   }
 
@@ -401,7 +558,7 @@ export class World {
     const inPort = name === 'port';
     this.garage.group.visible = !inPort;
     this.fleet.visible = !inPort;
-    this.port.group.visible = inPort;
+    if (this.port) this.port.group.visible = inPort;
     this.spreader.group.visible = inPort && this.spreaderOn;
     this.applyWorldState(name);
   }
@@ -449,17 +606,26 @@ export class World {
       }
       return jobs.get(f);
     };
+    // Sayt ochilishi kutadigan fayl (need) yuklanayotganda boshqalari boshlanmaydi — kanal to'liq unga; boshqalari
+    // kelsa ham, uni ochish (parse) uning o'zidan keyin: protsessor va meshopt oqimlari avval unga ishlaydi
+    let need = [];
+    const needLoading = () => need.some((f) => !jobs.get(f)?.fetched);
+    let needParsed = null;
     const pump = () => {
       while (active < 2 && queue.length) {
+        if (needLoading() && !need.includes(queue[0])) break;
         const f = queue.shift();
         const job = jobs.get(f);
         active++;
         fetcher.load(urlOf(f), (buf) => {
           active--;
+          job.fetched = true;
           pump();
           job.onBytes?.(f, Infinity);
-          gltf.parseAsync(buf, '').then(job.resolve, job.reject);
-        }, (e) => job.onBytes?.(f, e.loaded), (err) => { active--; pump(); job.reject(err); });
+          const parse = () => gltf.parseAsync(buf, '').then(job.resolve, job.reject);
+          if (need.includes(f)) parse();
+          else (needParsed ??= Promise.allSettled(need.map((n) => jobs.get(n).promise))).then(parse);
+        }, (e) => job.onBytes?.(f, e.loaded), (err) => { active--; job.fetched = true; pump(); job.reject(err); });
       }
     };
 
@@ -468,17 +634,17 @@ export class World {
     const rank = (i) => (i === this.selected ? -1 : narrow ? Math.abs(i - this.selected) : Math.abs(G.slots[i].x) + i * 1e-3);
     const order = this.cars.map((car, i) => i).sort((a, b) => rank(a) - rank(b));
     const files = [...new Set(order.map((i) => fileOf(this.cars[i])))];
+    // Sayt ochilishi kutadigan yagona fayl — tanlangan mashina (HTML bilan birga preload qilinadi, vite.config.js).
+    // Avval kompyuterda hamma mashinalar (~35 MB, 7 s gacha) kutilardi; endi qolganlari fonda yuklanib,
+    // kelishi bilan darvoza ortidan birin-ketin chiqadi
+    need = files.slice(0, 1);
     this.lazy = this.quality.mobile && narrow;
     const near = this.lazy ? order.filter((i) => Math.abs(i - this.selected) <= NEAR) : order;
     for (const f of new Set(near.map((i) => fileOf(this.cars[i])))) enqueue(f);
     if (!this.lazy) enqueue('ship'); // telefonda kema hikoyaga kirilganda so'raladi (tick → prioritize)
 
     this.load = {
-      fileOf, infoOf, order, jobs, t0: performance.now(),
-      // sayt ochilishi uchun albatta kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
-      need: files.slice(0, narrow ? 1 : 2),
-      // yuklovchi kutadiganlari: kompyuterda — hamma mashinalar (WAIT_ALL gacha), telefonda — faqat kerakligi
-      want: this.quality.mobile ? files.slice(0, narrow ? 1 : 2) : files,
+      fileOf, infoOf, order, jobs, need,
       get: (f) => enqueue(f).promise,
       /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi (navbatda bo'lmasa — qo'shiladi) */
       prioritize: (f) => {
@@ -489,9 +655,9 @@ export class World {
     };
   }
 
-  /** Joylarni modelsiz quradi va birinchi ko'rinadigan mashinalarni joylaydi (shu bilan sayt ochiladi) */
-  async mountFirst() {
-    const { fileOf, infoOf, need, want, jobs } = this.load;
+  /** Joylarni modelsiz quradi (soya, sichqoncha qutisi) va yuklash foizini kutiladigan faylga ulaydi */
+  createSlots() {
+    const { fileOf, infoOf, need, jobs } = this.load;
     const bytesOf = (f) => infoOf(f)?.bytes || 3e6;
 
     const shadowTex = makeShadowTexture();
@@ -537,29 +703,30 @@ export class World {
     for (const e of this.entities) uses.set(fileOf(e.car), (uses.get(fileOf(e.car)) || 0) + 1);
     this.load.uses = uses;
 
-    // yuklash foizi — yuklovchi kutadigan fayllar bo'yicha
-    const total = want.reduce((sum, f) => sum + bytesOf(f), 0);
-    const got = Object.fromEntries(want.map((f) => [f, 0]));
+    // yuklash foizi — kutiladigan fayl bo'yicha; oxirgi qismi — shader va teksturalarni tayyorlash (init)
+    const total = need.reduce((sum, f) => sum + bytesOf(f), 0);
+    const got = Object.fromEntries(need.map((f) => [f, 0]));
     const report = (f, n) => {
       got[f] = Math.min(n, bytesOf(f));
-      this.onProgress?.(Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
+      this.onProgress?.(0.85 * Math.min(1, Object.values(got).reduce((a, b) => a + b, 0) / total));
     };
-    for (const f of want) jobs.get(f).onBytes = report;
-
-    // fayl kelishi bilan mashina joyiga qo'yiladi (yashirin — sayt ochilgach navbat bilan chiqadi: startReveal).
-    // Muddat o'tgach kelganlari bu yerda emas, fonda qo'yiladi (mountRest)
-    let open = false;
-    const put = async (e) => { const g = await this.load.get(fileOf(e.car)); if (!open) this.mount(e, g, false); };
-    const first = this.entities.filter((e) => want.includes(fileOf(e.car)));
-    const core = first.filter((e) => need.includes(fileOf(e.car)));
-    const rest = first.filter((e) => !core.includes(e)).map((e) => put(e).catch((err) => console.warn('car load failed', e.car.id, err)));
-    await Promise.all(core.map(put));
-    const left = WAIT_ALL - (performance.now() - this.load.t0);
-    await Promise.race([Promise.all(rest), new Promise((r) => setTimeout(r, Math.max(0, left)))]);
-    open = true;
+    for (const f of need) jobs.get(f).onBytes = report;
   }
 
-  /** Modelni joyiga qo'yadi. background — sayt ochiq: ish bo'laklarga bo'linadi, mashina silliq paydo bo'ladi */
+  /**
+   * Tanlangan mashina fayli kelishi bilan uni tayyorlaydi (yashirin — sayt ochilgach navbat bilan chiqadi: startReveal).
+   * Shu fayldagi boshqa rangli nusxasi (masalan, oq G 63) — fonda, qolganlar bilan
+   */
+  async mountFirst() {
+    const e = this.entities[this.selected];
+    e.pending = true; // mountLater uni ikkinchi marta joylamasin
+    this.mount(e, await this.load.get(this.load.fileOf(e.car)), false).catch((err) => console.warn('car mount failed', e.car.id, err));
+  }
+
+  /**
+   * Modelni joyiga qo'yadi. background — sayt ochiq: ish kadrlar orasida bo'laklab. Shader va teksturalar mashina
+   * sahnaga qo'yilishidan oldin tayyorlanadi — u paydo bo'lganda kadr qotmaydi
+   */
   async mount(e, g, background) {
     if (e.model) return;
     const f = this.load.fileOf(e.car);
@@ -570,14 +737,17 @@ export class World {
     if (background) await idle();
     const { mats } = prepareCarMaterials(model, e.car);
     model.traverse((o) => { if (o.isMesh) o.castShadow = this.quality.shadows; });
-    if (background) {
-      // shader va teksturalar sahna ishlab turganda tayyorlanadi — mashina paydo bo'lganda kadr qotmaydi
-      await idle();
-      await this.precompile('garage', model);
-      await this.uploadTextures(model);
-    }
-    e.spin.add(model);
-    Object.assign(e, { model, rig, mats, dim: 1 });
+    if (background) await idle();
+    // shader va teksturalar tayyor bo'lgach sahnaga qo'yiladi. Bu kutish fondagi navbatni (later) to'xtatmaydi:
+    // GPU kompilyatsiya qilayotganda keyingi mashina tayyorlanaveradi
+    this.attach(e, { model, rig, mats }).catch((err) => console.warn('car mount failed', e.car.id, err));
+  }
+
+  async attach(e, parts) {
+    await this.precompile('garage', parts.model);
+    await this.uploadTextures(parts.model);
+    e.spin.add(parts.model);
+    Object.assign(e, parts, { dim: 1 });
     this.mounted++;
     if (this.revealing) this.reveal(e);
   }
@@ -603,11 +773,14 @@ export class World {
     this.revealNext = e.revealAt + REVEAL_STEP;
   }
 
-  /** Mashinani fonda yuklab joyiga qo'yadi (bir marta) */
+  /**
+   * Mashinani fonda yuklab joyiga qo'yadi (bir marta). Kirish animatsiyasini kutmaydi: mashinalar darvoza
+   * ochilayotganda kelishi bilan chiqadi (ish bo'laklarga bo'lingan — mount)
+   */
   mountLater(e) {
     if (e.model || e.pending) return;
     e.pending = true;
-    this.load.get(this.load.fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true)))
+    this.load.get(this.load.fileOf(e.car)).then((g) => this.later(() => this.mount(e, g, true), false))
       .catch((err) => { e.pending = false; console.warn('car load failed', e.car.id, err); });
   }
 
@@ -618,24 +791,20 @@ export class World {
     this.entities.forEach((e, k) => { if (Math.abs(k - i) <= NEAR) this.mountLater(e); });
   }
 
-  /** Qolgan mashinalar va kema — fonda, kelish tartibida, bittadan */
+  /** Qolgan mashinalar va kema — fonda, kelish tartibida, bittadan (port shaderlari — buildRest) */
   mountRest() {
     this.mountNear(this.selected);
-    if (this.lazy) {
-      // telefonda kema yaqin mashinalardan keyin yoki hikoyaga kirilganda (tick) so'raladi
-      setTimeout(() => this.loadShip(), 4000);
-      return;
-    }
-    // port shaderlari — sayt ochilish animatsiyasi tugagach va skroll to'xtagan paytda (kadr qotishi sezilmasin)
-    setTimeout(() => this.calm().then(() => this.later(() => this.warmPort())), 1500);
-    this.loadShip();
+    // telefonda kema yaqin mashinalardan keyin yoki hikoyaga kirilganda (tick) so'raladi
+    if (this.lazy) setTimeout(() => this.loadShip(), 4000);
+    else this.loadShip();
   }
 
   loadShip() {
     if (this.shipLoading) return;
     this.shipLoading = true;
     this.load.get('ship').then(async (g) => {
-      // kema va port shaderlari skroll to'xtagan paytda tayyorlanadi — kadr qotishi sezilmasin
+      // kema port qurilgach (buildRest) va skroll to'xtagan paytda joylanadi — kadr qotishi sezilmasin
+      await this.portReady;
       await this.calm();
       return this.later(async () => {
         await idle();
@@ -648,19 +817,19 @@ export class World {
     }).catch((e) => console.warn('ship load failed', e));
   }
 
-  /** Foydalanuvchi skroll qilmay turgan paytni kutadi (port kerak bo'lib qolsa — kutmaydi) */
-  async calm(ms = 700) {
-    while (performance.now() - this.lastInput < ms && this.targetP < 0.4) await new Promise((r) => setTimeout(r, 200));
+  /** Foydalanuvchi skroll qilmay turgan paytni kutadi (hikoyada `until` dan o'tgan bo'lsa — port kerak, kutmaydi) */
+  async calm(ms = 700, until = 0.4) {
+    while (performance.now() - this.lastInput < ms && this.targetP < until) await new Promise((r) => setTimeout(r, 200));
   }
 
   selectCar(i, silent = false) {
     if (i < 0 || i >= this.entities.length) return;
     const car = this.entities[i].car;
-    if (i !== this.selected || !this.outline.material.map) {
+    if (i !== this.selected || this.outlineDirty) {
       // katta nom teksturasi darhol emas: sichqoncha mashinalar ustidan o'tganda har biriga chizilmasin
       this.outlineDirty = true;
       clearTimeout(this.outlineTimer);
-      this.outlineTimer = setTimeout(() => idle(500).then(() => this.buildOutline()), 350);
+      this.outlineTimer = setTimeout(() => idle().then(() => this.buildOutline()), 350);
     }
     this.selected = i;
     this.load?.prioritize(this.load.fileOf(car));
@@ -671,6 +840,7 @@ export class World {
   buildOutline() {
     if (!this.outlineDirty) return;
     this.outlineDirty = false;
+    this.outlineFallback = !this.fontLoaded;
     const tex = makeOutlineTextTexture(this.entities[this.selected].car.outline);
     this.outline.material.map?.dispose();
     this.outline.material.map = tex;
@@ -832,6 +1002,10 @@ export class World {
       this.emit('hover', hov);
     }
 
+    // hovli, konteyner va port odatda fonda allaqachon qurilgan (buildRest); foydalanuvchi ularga undan tez
+    // yetib kelsa — hozir quriladi (bir marta)
+    if (Math.max(this.p, this.targetP) > YARD_AT) { this.ensureYard(); this.ensureContainer(); }
+    if (this.p > T.xfadeA - 0.02) this.ensurePort();
     this.story.update(this.p, dt, this.time);
     if (this.outlineDirty && this.outline.visible) this.buildOutline();
     // foydalanuvchi hikoyaga kirdi — kema navbatda oldinga

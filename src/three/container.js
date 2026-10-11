@@ -49,7 +49,19 @@ function ridgeU(length, { pitch = 0.278, flat = 0.075 } = {}) {
   return out.filter((v) => v < length).map((v) => v / length);
 }
 
-export function createContainer() {
+/** Konteyner ichidagi chiroq (konteyner koordinatasida) — world.js uni sahnaga boshidan qo'yadi */
+export function createContainerLight() {
+  const light = new THREE.PointLight('#dfeaff', 0, 7, 1.5);
+  light.position.set(0, C.H - 0.4, 0.4);
+  return light;
+}
+
+/**
+ * Konteyner bo'laklab quriladi (generator): har yield'dan keyin brauzer kadr chizib olishi mumkin.
+ * light — ixtiyoriy: sahnada oldindan turgan ichki chiroq (createContainerLight) — u oxirgi bo'lakda konteynerga
+ * o'tkaziladi (chaqiruvchi konteynerni o'sha zahoti sahnaga qo'shadi: chiroqlar soni bir kadr ham o'zgarmaydi)
+ */
+export function* buildContainer({ light } = {}) {
   const { L, W, H } = C;
   const group = new THREE.Group();
   group.name = 'hm-container';
@@ -79,6 +91,7 @@ export function createContainer() {
   const plyTex = makePlywoodTexture();
   plyTex.repeat.set(1, 2);
   const floorMat = new THREE.MeshStandardMaterial({ map: plyTex, roughness: 0.8, metalness: 0 });
+  yield;
 
   const box = (w, h, d, x, y, z, mat = frame, parent = group) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -121,6 +134,7 @@ export function createContainer() {
       box(0.06, 0.004, 0.11, cx, y + sy * 0.0595, cz, hole);
     }
   }
+  yield;
 
   // ---------- YON DEVORLAR (gofra) ----------
   const sideGeo = corrugated(L - 0.3, H - 0.27, SIDE);
@@ -150,13 +164,12 @@ export function createContainer() {
     m.position.set(-(W - 0.2) / 2, H - 0.06, 0);
   });
 
-  // ichki yoritgich (yuklash paytida yonadi)
+  // ichki yoritgich (yuklash paytida yonadi); chiroqning o'zi — oxirida
   const innerLightMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#e8f1ff') });
   const innerStrip = box(0.08, 0.03, L - 0.6, 0, H - 0.12, 0, innerLightMat);
   innerStrip.castShadow = false;
-  const innerLight = new THREE.PointLight('#dfeaff', 0, 7, 1.5);
-  innerLight.position.set(0, H - 0.4, 0.4);
-  group.add(innerLight);
+  const innerLight = light || createContainerLight();
+  yield;
 
   // ---------- ESHIKLAR ----------
   const doorH = H - 0.3;
@@ -241,6 +254,8 @@ export function createContainer() {
   setInnerLight(1);
 
   group.traverse((o) => { if (o.isMesh) o.frustumCulled = true; });
+  innerLight.position.set(0, H - 0.4, 0.4);
+  group.add(innerLight);
   return { group, setDoors, setInnerLight, innerStrip };
 }
 

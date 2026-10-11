@@ -26,6 +26,8 @@ export const P = {
   // quyosh: kema suzib ketadigan tomonda (+z), ufqdan ~11° — "oltin soat" yorug'i
   sunDir: new THREE.Vector3(-0.2, 0.19, 0.96).normalize(),
 };
+/** Kema ushlagichining prichaldagi joyi — hikoya (story.js) portning o'zi qurilmasdan oldin ham biladi */
+export const SHIP_BASE = new THREE.Vector3(P.shipX, P.waterY - P.shipDraftY * P.shipScale.y, P.shipZ);
 // quyosh yo'nalishiga perpendikulyar o'qlar (soya kamerasi tekisligi)
 const SUN_X = new THREE.Vector3(0, 1, 0).cross(P.sunDir).normalize();
 const SUN_Y = new THREE.Vector3().crossVectors(P.sunDir, SUN_X).normalize();
@@ -207,10 +209,11 @@ function makeWake() {
   };
 }
 
-/** Prichal: beton maydon, chet (koping), rezina amortizatorlar, bollardlar, kran relslari, chiziqlar */
-function makeQuay(quality) {
+/** Prichal: beton maydon, chet (koping), rezina amortizatorlar, bollardlar, kran relslari, chiziqlar (generator — buildPort) */
+function* makeQuay(quality) {
   const g = new THREE.Group();
   const ct = makeConcreteTextures({ seed: 33, tone: 158 });
+  yield;
   const slab = 8; // bitta tekstura = 8 m plita
   const QW = 160, QL = 420, QX = P.quayEdgeX - QW / 2, QZ = -70;
   const topTex = (t) => { const c = t.clone(); c.repeat.set(QW / slab, QL / slab); c.needsUpdate = true; return c; };
@@ -259,6 +262,7 @@ function makeQuay(quality) {
     white: new THREE.MeshStandardMaterial({ color: '#e6e8ea', map: grime, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -2 }),
   };
   for (const [k, b] of Object.entries(B)) { const m = b.mesh(mats[k]); if (m) g.add(m); }
+  yield;
 
   // ---------- konteyner steklari ----------
   const st = makeStackTextures();
@@ -328,7 +332,11 @@ function makeQuay(quality) {
   return g;
 }
 
-export function createPort({ quality }) {
+/**
+ * Port sahnasi bo'laklab quriladi (generator): har yield'dan keyin brauzer kadr chizib olishi mumkin —
+ * sayt ochilgandan keyin fonda quriladi, bitta uzun vazifa skrollni qotirmaydi. Qaytaradi: port API
+ */
+export function* buildPort({ quality }) {
   const group = new THREE.Group();
   group.name = 'port';
 
@@ -353,11 +361,14 @@ export function createPort({ quality }) {
     sky.uniforms.uSunScale.value = 1;
     wake.mesh.visible = wakeVis;
   };
+  yield;
 
-  group.add(makeQuay(quality));
+  group.add(yield* makeQuay(quality));
+  yield;
   const crane = createCrane({ zc: G.container.z, legX: P.craneLegX, half: P.craneHalfGauge, boomY: P.boomY });
   if (!quality.shadows) crane.group.traverse((o) => { o.castShadow = false; });
   group.add(crane.group);
+  yield;
 
   // quyosh (soya beradi) — soya kamerasi harakat markaziga suriladi (piksellarga yopishtirilgan).
   // Kema quyosh tomon suzadi: yo'nalishi deyarli nur bo'ylab, shuning uchun suzish paytida soya kamerasi
@@ -376,7 +387,7 @@ export function createPort({ quality }) {
   group.add(new THREE.HemisphereLight('#bcd2ec', '#4b5561', 0.55));
 
   const shipHolder = new THREE.Group();
-  shipHolder.position.set(P.shipX, P.waterY - P.shipDraftY * P.shipScale.y, P.shipZ);
+  shipHolder.position.copy(SHIP_BASE);
   group.add(shipHolder);
   let shipPrep = null;
 
