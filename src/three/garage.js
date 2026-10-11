@@ -25,11 +25,10 @@ export const G = {
   slotR: 1.74,
   slotRing: 0.16,
   skyR: 6.2,     // sahna ustidagi yorug' doira
-  // chapdan o'ngga (cars.js → GARAGE tartibida): 6 ta chapda, 5 ta o'ngda, o'rtada yo'lak.
-  // Oraliq 4 m — yo'lga chiqqan mashina qo'shnisiga, devorga va sahnaga tegmaydi (eng chetdagisi devor
-  // egilgani uchun biroz oldinda). Joy qo'shilsa yoki surilsa, haydash yo'llarini qayta tekshiring.
+  // chapdan o'ngga (cars.js → GARAGE tartibida): 5 ta chapda, 5 ta o'ngda, o'rtada yo'lak.
+  // Oraliq 4 m — yo'lga chiqqan mashina qo'shnisiga, devorga va sahnaga tegmaydi.
+  // Joy qo'shilsa yoki surilsa, haydash yo'llarini qayta tekshiring.
   slots: [
-    { x: -24.5, z: 0.8,  yaw: 0.5 },
     { x: -20.5, z: -1.0, yaw: 0.5 },
     { x: -16.5, z: -1.0, yaw: 0.5 },
     { x: -12.5, z: -1.0, yaw: 0.5 },
