@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { GARAGE, GARAGE_START } from './src/data/cars.js';
 
@@ -41,11 +42,13 @@ const preloadHero = {
   },
 };
 
-// Saytning asosiy manzili: ijtimoiy tarmoqlar preview rasmni (og:image) faqat to'liq manzil bilan oladi
+// Saytning asosiy manzili: ijtimoiy tarmoqlar preview rasmni (og:image) faqat to'liq manzil bilan oladi.
+// Rasm manzilida fayl xeshi (%OG_V%): og.jpg o'zgarsa manzil ham o'zgaradi — Telegram eski rasmni ko'rsatmaydi
 const SITE_URL = (process.env.SITE_URL || 'https://hmgroup-uz.vercel.app').replace(/\/$/, '');
+const OG_V = crypto.createHash('md5').update(fs.readFileSync(path.resolve('public/og.jpg'))).digest('hex').slice(0, 10);
 const socialMeta = {
   name: 'social-meta',
-  transformIndexHtml: { order: 'pre', handler: (html) => html.replaceAll('%SITE_URL%', SITE_URL) },
+  transformIndexHtml: { order: 'pre', handler: (html) => html.replaceAll('%SITE_URL%', SITE_URL).replaceAll('%OG_V%', OG_V) },
 };
 
 export default defineConfig({
