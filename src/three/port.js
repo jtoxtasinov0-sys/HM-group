@@ -210,11 +210,11 @@ function makeWake() {
 /** Prichal: beton maydon, chet (koping), rezina amortizatorlar, bollardlar, kran relslari, chiziqlar */
 function makeQuay(quality) {
   const g = new THREE.Group();
-  const ct = makeConcreteTextures({ seed: 33, tone: 158 });
+  const ct = makeConcreteTextures(); // hovli bilan umumiy; prichal biroz yorug'roq (top → color)
   const slab = 8; // bitta tekstura = 8 m plita
   const QW = 160, QL = 420, QX = P.quayEdgeX - QW / 2, QZ = -70;
   const topTex = (t) => { const c = t.clone(); c.repeat.set(QW / slab, QL / slab); c.needsUpdate = true; return c; };
-  const top = new THREE.MeshStandardMaterial({ map: topTex(ct.map), normalMap: topTex(ct.normalMap), roughnessMap: topTex(ct.roughnessMap), roughness: 1, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8) });
+  const top = new THREE.MeshStandardMaterial({ color: new THREE.Color(1.09, 1.09, 1.08), map: topTex(ct.map), normalMap: topTex(ct.normalMap), roughnessMap: topTex(ct.roughnessMap), roughness: 1, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8) });
   const faceTex = ct.map.clone(); faceTex.repeat.set(QL / slab, 1); faceTex.needsUpdate = true;
   const side = new THREE.MeshStandardMaterial({ color: '#7f8790', map: faceTex, roughness: 0.95 });
   const quay = new THREE.Mesh(new THREE.BoxGeometry(QW, 8, QL), [side, side, top, side, side, side]);

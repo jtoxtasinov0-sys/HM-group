@@ -1,4 +1,4 @@
-// HM Group — 3D garaj va «Mijozlar» bo'limi uchun mashinalar (3D model bilan).
+// HM Group — 3D garaj uchun mashinalar (3D model bilan).
 // DIQQAT: bu NAMUNA ma'lumotlar. Saytdagi «Sotuvda» katalogi — src/data/stock.js (haqiqiy mashinalar).
 //
 // paint      — garajdagi 3D model rangi (src/three/materials.js → PAINTS)

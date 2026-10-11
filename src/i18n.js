@@ -3,7 +3,6 @@ export const DICT = {
   uz: {
     'nav.sale': 'Sotuvda',
     'nav.reviews': 'Obzorlar',
-    'nav.clients': 'Mijozlar',
     'nav.about': 'Biz haqimizda',
     'nav.logistics': 'Logistika',
     'nav.contact': 'Kontakt',
@@ -79,10 +78,6 @@ export const DICT = {
     'reels.next': 'Keyingi video',
     'reels.more': 'Barcha obzorlar — Instagram\'da',
 
-    'clients.title': 'Mijozlarimiz fikri',
-    'clients.text': 'Mashinasini qabul qilgan mijozlarimizning video va fikrlari — Instagram\'dagi «Mijozlar» bo\'limida.',
-    'clients.more': 'Barcha fikrlar — Instagram\'da',
-
     'about.title': 'Koreyadagi avtosalon.<br>Butun dunyo bo\'ylab hamkorlar.',
     'about.text': 'HM Group — Janubiy Koreyada ofis va avtosalonga ega kompaniya. Koreyadan O\'zbekistonga va boshqa davlatlarga avtomobil eksport qilamiz. O\'zbekistonda vakilimiz bor.',
     'about.s1': 'Instagram obunachilar',
@@ -123,7 +118,6 @@ export const DICT = {
   ru: {
     'nav.sale': 'В продаже',
     'nav.reviews': 'Обзоры',
-    'nav.clients': 'Клиенты',
     'nav.about': 'О нас',
     'nav.logistics': 'Логистика',
     'nav.contact': 'Контакты',
@@ -198,10 +192,6 @@ export const DICT = {
     'reels.prev': 'Предыдущее видео',
     'reels.next': 'Следующее видео',
     'reels.more': 'Все обзоры — в Instagram',
-
-    'clients.title': 'Отзывы клиентов',
-    'clients.text': 'Видео и отзывы клиентов, получивших свои автомобили, — в разделе «Mijozlar» в Instagram.',
-    'clients.more': 'Все отзывы — в Instagram',
 
     'about.title': 'Автосалон в Корее.<br>Партнёры по всему миру.',
     'about.text': 'HM Group — компания с офисом и автосалоном в Южной Корее. Экспортируем автомобили из Кореи в Узбекистан и другие страны. В Узбекистане есть наш представитель.',

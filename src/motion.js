@@ -27,7 +27,7 @@ export function initMotion({ lenis, reduce }) {
   const curtain = createCurtain($('#story'), $('.curtain'), reduce);
   const kinetic = createKinetic($('#aboutTitle'), reduce);
   const mark = createRise($('#footerMark'), reduce);
-  if (fine && !reduce) ['#catalog', '#clients'].forEach((s) => tilt($(s)));
+  if (fine && !reduce) tilt($('#catalog'));
 
   let lastP = -1;
   const update = () => {
@@ -174,7 +174,7 @@ function tilt(root) {
   const leave = () => { if (card) card.classList.remove('is-tilt'); card = null; };
   root.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
-    const c = e.target.closest('.card, .clip');
+    const c = e.target.closest('.card');
     if (c !== card) { leave(); card = c; if (c) c.classList.add('is-tilt'); }
     ev = e;
     if (card && !raf) raf = requestAnimationFrame(apply);

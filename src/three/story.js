@@ -94,37 +94,48 @@ export function createStory(world) {
     return { pos: V(m.x * h.pan, h.y + m.y * 0.25, D), tgt: V(m.x * h.pan * 0.8, h.ty, -1.5), fov: h.fov, shift: h.shift };
   };
   const pr = () => world.portrait;
-  // Telefonda (portret) ekran tor — kompyuterdagi kadrlarda mashina va konteyner chetlardan kesilib, kamera
-  // "yopishib" qolardi. Garajda (ochiq joy) kamera uzoqroq turadi; eshik va hovlida yo'li devorga tegmasligi uchun
-  // joyi o'sha, lekin obyektiv kengroq (fov) va kadr biroz tepaga (shift < 0) — pastdagi panel mashinani yopmasin
+  // Telefonda (portret) ekran tor: gorizontal ko'rish burchagi kompyuterdagidan ~2 baravar kichik (~30° va ~63°).
+  // Kompyuterdagi kadrlarda mashina va ayniqsa konteyner ekrandan chiqib ketib, kamera "yopishib" qolardi.
+  // Shuning uchun telefonda kamera uzoqroqda va obyektiv kengroq (fov), kadr biroz tepada (shift < 0 —
+  // pastdagi panel mashinani yopmasin). Kamera yo'li to'siqlarga tegmaydi: garajdan faqat eshik orqali
+  // chiqadi (devor z = -9, eshik eni 5.4 m), kran portali ichida oyoq va to'sinlardan 1.5 m+ narida yuradi.
+  // only: 'portrait' — faqat telefonda ishlatiladigan qo'shimcha kadr
   const KF = [
     { p: 0, cam: heroCam },
     { p: T.moveB, cam: () => ({ pos: pr() ? V(3.4, 3.2, 19.6) : V(4.7, 1.95, 12.6), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
     { p: T.showB, cam: () => ({ pos: pr() ? V(-3.6, 3.3, 19.4) : V(-4.9, 2.2, 12.0), tgt: V(0, 0.85, G.stage.z), fov: pr() ? 50 : 30 }) },
     { p: T.driveA, cam: () => ({ pos: pr() ? V(2.2, 3.6, 16.0) : V(2.4, 2.9, 11.2), tgt: V(0, 1.3, -8), fov: pr() ? 54 : 34, shift: pr() ? -0.06 : 0 }) },
     { p: 0.36, cam: () => ({ pos: pr() ? V(0.9, 2.8, 5.8) : V(1.6, 2.6, 5.0), tgt: V(0, 1.2, -12), fov: pr() ? 68 : 36, shift: pr() ? -0.14 : 0 }) },
-    { p: T.driveB, cam: () => ({ pos: V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 66 : 38, shift: pr() ? -0.1 : 0 }) },
-    { p: T.closeB, cam: () => ({ pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: pr() ? 70 : 38, shift: pr() ? -0.1 : 0 }) },
-    { p: T.spreadB, cam: () => ({ pos: V(8.5, 3.6, -11.2), tgt: V(0, 2.0, G.container.z), fov: pr() ? 58 : 38 }) },
+    // telefonda kamera garaj ichida, eshik ortida qoladi: konteyner eshigi ro'paradan, butunligicha ko'rinadi
+    { p: T.driveB, cam: () => ({ pos: pr() ? V(0.9, 2.5, -6.0) : V(0.9, 2.3, -8.3), tgt: V(0, 1.2, -16.5), fov: pr() ? 70 : 38, shift: pr() ? -0.1 : 0 }) },
+    { p: T.closeB, cam: () => (pr()
+      ? { pos: V(0.6, 2.8, -7.0), tgt: V(0, 1.4, -15.2), fov: 72, shift: -0.08 }
+      : { pos: V(4.6, 2.3, -10.5), tgt: V(0, 1.3, -13.6), fov: 38 }) },
+    // hovli portga to'liq almashguncha (xfadeB) telefonda kamera eshik ortida turadi — devor orqali o'tmaydi
+    { p: T.xfadeB, only: 'portrait', cam: () => ({ pos: V(0.8, 3.1, -7.4), tgt: V(0, 1.8, G.container.z), fov: 72, shift: -0.04 }) },
+    { p: T.spreadB, cam: () => ({ pos: pr() ? V(7.6, 4.6, -7.2) : V(8.5, 3.6, -11.2), tgt: V(0, pr() ? 2.6 : 2.0, G.container.z), fov: pr() ? 72 : 38 }) },
     // ko'tarilish — kamera konteyner bilan birga, kran portali ichida (oyoqlar va to'sinlardan uzoqda):
     // eshiklar va yon tomon ko'rinadi, orqada port steklari
-    { p: 0.545, cam: () => ({ pos: contPos.clone().add(V(7.2, 1.9, 5.6)), tgt: contPos.clone().add(V(0, 1.4, 0)), fov: pr() ? 58 : 38 }) },
-    { p: 0.63, cam: () => ({ pos: contPos.clone().add(V(7.4, 2.6, 3.0)), tgt: contPos.clone().add(V(0, 1.2, 0)), fov: pr() ? 58 : 40 }) },
+    { p: 0.545, cam: () => ({ pos: contPos.clone().add(pr() ? V(7.6, 3.0, 9.2) : V(7.2, 1.9, 5.6)), tgt: contPos.clone().add(V(0, 1.4, 0)), fov: pr() ? 72 : 38 }) },
+    // telefonda ham kran "derazasi"dan oyoqlardan 3 m+ narida chiqadi (z siljishi 7 m dan oshmaydi)
+    { p: 0.63, cam: () => ({ pos: contPos.clone().add(pr() ? V(7.6, 3.4, 6.8) : V(7.4, 2.6, 3.0)), tgt: contPos.clone().add(V(0, 1.2, 0)), fov: pr() ? 74 : 40 }) },
     // konteyner strela bo'ylab kemaga ketadi: kamera portaldan oyoqlar orasidagi "deraza" orqali
     // (to'sinlardan 5 m+ uzoqda) dengiz tomonga chiqadi — konteyner yo'lidan doim 10 m+ narida,
     // quyosh kamera orqasida
-    { p: T.moveXB, cam: () => ({ pos: V(42, 34, 4), tgt: contPos.clone().add(V(0, -3, 0)), fov: pr() ? 62 : 42 }) },
+    { p: T.moveXB, cam: () => ({ pos: V(42, 34, 4), tgt: contPos.clone().add(V(0, -3, 0)), fov: pr() ? 66 : 42 }) },
     // kemaga tushirish — dengiz tomondan
-    { p: T.lowerB, cam: () => ({ pos: V(44, 25, 10), tgt: V(slot.x, slot.y + 0.5, slot.z), fov: pr() ? 60 : 38 }) },
-    { p: 0.83, cam: () => ({ pos: V(72, 40, 36), tgt: V(P.shipX - 2, 6, -18), fov: pr() ? 62 : 40 }) },
+    { p: T.lowerB, cam: () => ({ pos: V(44, 25, 10), tgt: V(slot.x, slot.y + 0.5, slot.z), fov: pr() ? 64 : 38 }) },
+    { p: 0.83, cam: () => ({ pos: V(72, 40, 36), tgt: V(P.shipX - 2, 6, -18), fov: pr() ? 64 : 40 }) },
     // yakun: kema quyosh tomon, ufqqa suzib ketadi
     { p: 1.0, cam: () => ({ pos: V(80, 28, -50), tgt: V(14, 4, 210), fov: pr() ? 60 : 36 }) },
   ];
+  const KF_WIDE = KF.filter((k) => !k.only);
 
   function sampleCam(p) {
+    const kf = pr() ? KF : KF_WIDE;
     let i = 0;
-    while (i < KF.length - 2 && p >= KF[i + 1].p) i++;
-    const a = KF[i], b = KF[i + 1];
+    while (i < kf.length - 2 && p >= kf[i + 1].p) i++;
+    const a = kf[i], b = kf[i + 1];
     const t = ease(seg(p, a.p, b.p));
     const ca = a.cam(), cb = b.cam();
     camPos.lerpVectors(ca.pos, cb.pos, t);

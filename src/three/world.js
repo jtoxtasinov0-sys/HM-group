@@ -253,7 +253,14 @@ export class World {
     });
 
     // yuklash: sayt birinchi ko'rinadigan mashina(lar) bilan ochiladi, qolganlari fonda qo'shiladi
-    await this.mountFirst();
+    const first = this.mountFirst();
+    // Mashina yuklanayotgan paytda garaj va post-effekt shaderlari tayyorlanadi: yuklovchi ostida bitta bo'sh kadr
+    // chiziladi. Shader haqiqatda birinchi chizilganda kompilyatsiya bo'ladi (telefonda parallel kompilyatsiya yo'q) —
+    // avval bu qotish mashina kelgandan keyin, yuklovchi 100% da turganda bo'lardi
+    this.resize();
+    await this.precompile('garage');
+    this.render();
+    await first;
 
     this.story = createStory(this);
     this.raycaster = new THREE.Raycaster();
@@ -409,6 +416,19 @@ export class World {
       const v = this.manifest[f]?.v; // fayl o'zgarsa manzil ham o'zgaradi — brauzer keshidan bemalol olinadi
       return `${import.meta.env.BASE_URL}models/${f}.glb${v ? `?v=${v}` : ''}`;
     };
+    // tartib: avval birinchi kadrda ko'rinadiganlar (tanlangan mashina, keyin markazdan chetga), kema oxirida
+    const narrow = this.quality.mobile || innerWidth / innerHeight < 0.95;
+    const rank = (i) => (i === this.selected ? -1 : narrow ? Math.abs(i - this.selected) : Math.abs(G.slots[i].x) + i * 1e-3);
+    const order = this.cars.map((car, i) => i).sort((a, b) => rank(a) - rank(b));
+    const files = [...new Set(order.map((i) => fileOf(this.cars[i])))];
+    this.lazy = this.quality.mobile && narrow;
+    // sayt ochilishi uchun kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi.
+    // Ular kelguncha boshqa fayl so'ralmaydi: avval qo'shni mashina ham parallel yuklanib, tarmoqni teng bo'lardi —
+    // birinchi mashina ~2 baravar sekin kelib, yuklovchi shuncha uzoq turardi
+    const need = files.slice(0, narrow ? 1 : 2);
+    let waiting = need.length;
+    const arrived = (f) => { if (need.includes(f)) waiting--; };
+
     const jobs = new Map(); // fayl → { promise, onBytes }
     const queue = [];
     let active = 0;
@@ -425,32 +445,27 @@ export class World {
     };
     const pump = () => {
       while (active < 2 && queue.length) {
-        const f = queue.shift();
+        const k = waiting > 0 ? queue.findIndex((f) => need.includes(f)) : 0;
+        if (k < 0) return;
+        const [f] = queue.splice(k, 1);
         const job = jobs.get(f);
         active++;
         fetcher.load(urlOf(f), (buf) => {
           active--;
+          arrived(f);
           pump();
           job.onBytes?.(f, Infinity);
           gltf.parseAsync(buf, '').then(job.resolve, job.reject);
-        }, (e) => job.onBytes?.(f, e.loaded), (err) => { active--; pump(); job.reject(err); });
+        }, (e) => job.onBytes?.(f, e.loaded), (err) => { active--; arrived(f); pump(); job.reject(err); });
       }
     };
 
-    // tartib: avval birinchi kadrda ko'rinadiganlar (tanlangan mashina, keyin markazdan chetga), kema oxirida
-    const narrow = this.quality.mobile || innerWidth / innerHeight < 0.95;
-    const rank = (i) => (i === this.selected ? -1 : narrow ? Math.abs(i - this.selected) : Math.abs(G.slots[i].x) + i * 1e-3);
-    const order = this.cars.map((car, i) => i).sort((a, b) => rank(a) - rank(b));
-    const files = [...new Set(order.map((i) => fileOf(this.cars[i])))];
-    this.lazy = this.quality.mobile && narrow;
     const near = this.lazy ? order.filter((i) => Math.abs(i - this.selected) <= NEAR) : order;
     for (const f of new Set(near.map((i) => fileOf(this.cars[i])))) enqueue(f);
     if (!this.lazy) enqueue('ship'); // telefonda kema hikoyaga kirilganda so'raladi (tick → prioritize)
 
     this.load = {
-      fileOf, order, jobs,
-      // sayt ochilishi uchun kerakli fayllar: telefonda — tanlangan mashina, kompyuterda — markazdagi ikkitasi
-      need: files.slice(0, narrow ? 1 : 2),
+      fileOf, order, jobs, need,
       get: (f) => enqueue(f).promise,
       /** foydalanuvchi qaragan mashina navbatda oldinga o'tadi (navbatda bo'lmasa — qo'shiladi) */
       prioritize: (f) => {

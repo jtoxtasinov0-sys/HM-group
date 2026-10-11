@@ -1,13 +1,14 @@
 import Lenis from 'lenis';
-import { GARAGE, GARAGE_START, byId } from './data/cars.js';
+import { GARAGE, GARAGE_START } from './data/cars.js';
 import { STOCK, REELS, reelUrl } from './data/stock.js';
 import { applyI18n, setLang, onLang, t, getLang } from './i18n.js';
 import { World, detectQuality } from './three/world.js';
 import { seg } from './three/story.js';
 import { initMotion } from './motion.js';
+// modellar ro'yxati (o'lcham, xesh) saytga yig'ishda qo'shiladi — 3D uchun alohida so'rov kutilmaydi
+import manifest from '../public/models/manifest.json';
 
 const TG = 'https://t.me/+ETmfnYnu1mVkMjk1';
-const IG = 'https://www.instagram.com/hmgroup.uz/';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -83,10 +84,9 @@ new IntersectionObserver(([en]) => {
   if (en.isIntersecting) navLinks.forEach((a) => { a.classList.remove('is-current'); a.removeAttribute('aria-current'); });
 }, { rootMargin: '-45% 0px -50% 0px' }).observe($('#story'));
 
-// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar, Mijozlar ----------------
+// ---------------- Katalog (sotuvdagi mashinalar), Obzorlar ----------------
 // sayt papkada joylashsa ham ishlashi uchun (masalan, GitHub Pages: /HM-group/)
 const BASE = import.meta.env.BASE_URL;
-const renderSrc = (id) => `${BASE}renders/${id}.webp`;
 const photoSrc = (id, n) => `${BASE}cars/${id}/${n}.webp`;
 const specRow = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
 const lang = () => getLang();
@@ -193,7 +193,7 @@ function syncPreview(v) {
 function renderReels() {
   $('#reels').innerHTML = REELS.map((r, i) => `
     <article class="reel reveal">
-      <video class="reel__video" src="${reelSrc(r.id, '-preview.mp4')}" poster="${reelSrc(r.id, '.webp')}" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true"></video>
+      <video class="reel__video" src="${reelSrc(r.id, '-preview.mp4')}" data-poster="${reelSrc(r.id, '.webp')}" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true"></video>
       <span class="reel__muted" aria-hidden="true">${MUTED_ICON}</span>
       <div class="reel__cap">
         <strong class="reel__title"></strong>
@@ -203,6 +203,12 @@ function renderReels() {
     </article>`).join('');
   updateReels();
   observeReveal($('#reels'));
+  // muqovalar bo'lim yaqinlashganda so'raladi: sayt ochilayotganda birinchi mashina bilan tarmoqni bo'lishmaydi
+  new IntersectionObserver(([en], obs) => {
+    if (!en.isIntersecting) return;
+    obs.disconnect();
+    $$('#reels .reel__video').forEach((v) => { v.poster = v.dataset.poster; });
+  }, { rootMargin: '1500px 0px' }).observe($('#reels'));
   $$('#reels .reel__video').forEach((v) => {
     v.muted = true; // avtomatik o'ynash faqat ovozsiz videoga ruxsat etiladi
     if (PREVIEW_AUTOPLAY) previewIO.observe(v);
@@ -287,21 +293,6 @@ $('#filters').addEventListener('click', (e) => {
   });
 });
 
-function renderClients() {
-  const ids = ['sportage', 'g63', 'ev9', 'escalade'];
-  const inCls = seen($('#clients'));
-  $('#clients').innerHTML = ids.map((id) => {
-    const c = byId(id);
-    return `<a class="clip reveal${inCls}" href="${IG}" target="_blank" rel="noopener">
-      <span class="clip__play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></span>
-      <img src="${renderSrc(id)}" alt="" loading="lazy" onerror="this.remove()">
-      <strong>${c.brand} ${c.model}</strong>
-      <span>${lang() === 'ru' ? 'Видео клиента' : 'Mijoz videosi'} · Instagram</span>
-    </a>`;
-  }).join('');
-  observeReveal($('#clients'));
-}
-
 // ---------------- Reveal + raqamlar ----------------
 // Bir vaqtda ekranga kirgan elementlar navbat bilan ochiladi (kechikish 5 qadam bilan cheklangan).
 // Animatsiya tugagach kechikish olib tashlanadi — hover darhol javob beradi.
@@ -365,12 +356,11 @@ function updateLogistics() {
 }
 new IntersectionObserver(([en]) => { logActive = en.isIntersecting; updateLogistics(); }, { rootMargin: '10% 0px' }).observe($('#logistika'));
 
-function renderAll() { renderCatalog(); renderClients(); }
-renderAll();
+renderCatalog();
 renderReels();
 observeReveal();
 const motion = initMotion({ lenis, reduce: REDUCE });
-onLang(() => { renderAll(); updateReels(); updateShowcase(); updateHint(); motion.refresh(); });
+onLang(() => { renderCatalog(); updateReels(); updateShowcase(); updateHint(); motion.refresh(); });
 
 // ---------------- 3D hikoya qatlamlari ----------------
 const layers = {
@@ -574,12 +564,9 @@ const setLoad = (k) => {
 
 async function boot() {
   try {
-    // shrift (canvas yozuvlari uchun) va modellar ro'yxati bir vaqtda; shrift sekin kelsa — uzoq kutilmaydi
+    // shrift (canvas yozuvlari uchun); sekin kelsa — uzoq kutilmaydi
     const font = document.fonts.load('600 100px Inter').catch(() => {});
-    const [manifest] = await Promise.all([
-      fetch(`${BASE}models/manifest.json`, { cache: 'no-cache' }).then((r) => r.json()),
-      Promise.race([font, new Promise((r) => setTimeout(r, 2500))]),
-    ]);
+    await Promise.race([font, new Promise((r) => setTimeout(r, 2500))]);
     const quality = detectQuality();
     world = new World($('#webgl'), { cars: GARAGE, start: GARAGE_START, manifest, quality, onProgress: setLoad });
     await world.init();

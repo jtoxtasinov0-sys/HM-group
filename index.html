@@ -29,9 +29,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet" />
+  <!-- Inter saytning o'zida (public/fonts, @font-face — styles.css): Google Fonts'ga alohida ulanish kutilmaydi -->
+  <link rel="preload" href="/fonts/inter-v20-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/src/styles.css" />
   <script>document.documentElement.classList.add('js');</script>
 </head>
@@ -67,7 +66,6 @@
     <nav class="nav__links" id="navLinks">
       <a href="#sotuvda" data-i18n="nav.sale">Sotuvda</a>
       <a href="#obzorlar" data-i18n="nav.reviews">Obzorlar</a>
-      <a href="#mijozlar" data-i18n="nav.clients">Mijozlar</a>
       <a href="#biz-haqimizda" data-i18n="nav.about">Biz haqimizda</a>
       <a href="#logistika" data-i18n="nav.logistics">Logistika</a>
       <a href="#kontakt" data-i18n="nav.contact">Kontakt</a>
@@ -221,20 +219,6 @@
       </div>
     </section>
 
-    <!-- ============ MIJOZLAR ============ -->
-    <section class="section section--light" id="mijozlar">
-      <div class="wrap">
-        <header class="sec-head reveal">
-          <h2 class="sec-title" data-i18n="clients.title">Mijozlarimiz fikri</h2>
-          <p class="sec-text" data-i18n="clients.text"></p>
-        </header>
-        <div class="clients" id="clients"></div>
-        <div class="center reveal">
-          <a class="btn btn--navy" href="https://www.instagram.com/hmgroup.uz/" target="_blank" rel="noopener" data-i18n="clients.more">Barcha fikrlar — Instagram'da</a>
-        </div>
-      </div>
-    </section>
-
     <!-- ============ BIZ HAQIMIZDA ============ -->
     <section class="section section--navy" id="biz-haqimizda">
       <div class="wrap about">
@@ -350,7 +334,6 @@
       <nav class="footer__links">
         <a href="#sotuvda" data-i18n="nav.sale"></a>
         <a href="#obzorlar" data-i18n="nav.reviews"></a>
-        <a href="#mijozlar" data-i18n="nav.clients"></a>
         <a href="#biz-haqimizda" data-i18n="nav.about"></a>
         <a href="#logistika" data-i18n="nav.logistics"></a>
         <a href="#kontakt" data-i18n="nav.contact"></a>

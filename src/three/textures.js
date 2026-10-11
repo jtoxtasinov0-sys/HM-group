@@ -284,7 +284,7 @@ export function heightToNormal(src, strength = 2, { wrap = true } = {}) {
     for (let x = 0; x < w; x++) {
       const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
       const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
-      const l = Math.hypot(dx, dy, 1);
+      const l = Math.sqrt(dx * dx + dy * dy + 1); // Math.hypot bu yerda (million piksel) bir necha baravar sekin
       const i = (y * w + x) * 4;
       // canvas'da y pastga, UV'da v yuqoriga (flipY) — yashil kanal shunga mos
       img.data[i] = (-dx / l * 0.5 + 0.5) * 255;
@@ -433,9 +433,13 @@ export function makePlywoodTexture() {
 
 /**
  * Beton plitalar (hovli / port): chok chiziqlari, yoriqlar, moy dog'lari, mayda toshlar.
- * Bitta tekstura bitta plitani bildiradi (takrorlanadi). Qaytaradi: { map, roughnessMap, normalMap }
+ * Bitta tekstura bitta plitani bildiradi (takrorlanadi). Qaytaradi: { map, roughnessMap, normalMap }.
+ * Hovli va port bitta to'plamni ishlatadi (bir marta chiziladi — sayt tezroq ochiladi): har biri o'ziga
+ * klon oladi (repeat alohida), rasm umumiy
  */
-export function makeConcreteTextures({ seed = 31, tone = 150 } = {}) {
+export const makeConcreteTextures = once(() => makeConcrete({ seed: 35, tone: 152 }));
+
+function makeConcrete({ seed = 31, tone = 150 } = {}) {
   const S = 1024;
   const r = rand(seed);
   const [c, ctx] = canvas(S, S);

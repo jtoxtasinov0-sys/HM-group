@@ -19,7 +19,7 @@ Skroll orqali hikoya qiluvchi premium sayt:
 5. **Yetkazish**: kema quyosh tomon suzib ketadi — "40–45 kun".
 
 Hikoya oxirida brendlar lentasi (Mercedes-Benz, Porsche, BMW...) 3D sahna ustiga "parda" bo'lib ko'tariladi,
-sahna esa kichrayib orqaga ketadi. Undan keyin oddiy bo'limlar: Sotuvda, Obzorlar, Mijozlar, Biz haqimizda,
+sahna esa kichrayib orqaga ketadi. Undan keyin oddiy bo'limlar: Sotuvda, Obzorlar, Biz haqimizda,
 Logistika, Kontakt.
 
 - **Sotuvda** — haqiqiy mashinalar (Instagram e'lonlaridan): har birida 4 ta rasm (surib ko'riladi), ma'lumotlar,
@@ -76,16 +76,15 @@ Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
 | 3D garajdagi mashinalar | `src/data/cars.js` |
 | Garajdagi mashinalar va ularning tartibi | `src/data/cars.js` → `GARAGE` (joylar: `src/three/garage.js` → `G.slots`) |
 | Barcha matnlar (UZ / RU) | `src/i18n.js` |
-| Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`, `IG`) |
+| Telefon, Telegram, Instagram | `index.html` va `src/main.js` (`TG`) |
 | Ranglar | `src/styles.css` (`:root`) |
 | Animatsiyalar (kirish, paydo bo'lish, logistika yo'li) | `src/styles.css` ("Paydo bo'lish animatsiyalari") va `src/main.js` |
 | Brendlar lentasi, parda, egilish, footer belgisi | `index.html` (`.curtain`), `src/motion.js`, `src/styles.css` ("Harakatlar") |
-| Shrift (Inter) | `index.html` (Google Fonts) va `src/styles.css` (`--font`) |
+| Shrift (Inter) | `public/fonts` (saytning o'zida), `@font-face` va `--font` — `src/styles.css`, preload — `index.html` |
 | Logotip (HM belgisi) | `src/logo.js` — sayt, 3D sahna va ikonkalar shu shakldan chiziladi |
 | Favicon va telefon ikonkalari | `npm run icons` — `public/` ga yozadi (`tools/icons.mjs`) |
 
 **Muhim:** `src/data/cars.js` dagi 3D garaj mashinalarining ma'lumotlari **namuna** (haqiqiy katalog — `stock.js`).
-"Mijozlar" bo'limidagi kartochkalar Instagram'ga olib boradi — xohlasangiz haqiqiy videolarni qo'shing.
 
 ## Sotuvdagi mashina qo'shish
 
@@ -112,7 +111,8 @@ Kompyuterda garajdagi barcha mashinalar va kema yuklanadi (~38 MB). Telefonda (p
 mashina ko'rinadi, shuning uchun faqat tanlangan mashina va uning har ikki tomonidagi 2 tadan yuklanadi (~15 MB),
 qolganlari foydalanuvchi ‹ › bilan ularga o'tganda; telefon yotqizilsa — hammasi. Sayt tez ochilishi uchun faqat birinchi
 kadrda kerakli modellar kutiladi: kompyuterda markazdagi 2 ta fayl (G 63 + Urus, ~6.7 MB), telefonda —
-tanlangan mashina (G 63, ~3.4 MB). Qolganlari markazdan chetga tartibda, bir vaqtda 2 tadan fonda
+tanlangan mashina (G 63, ~3.4 MB). Ular kelguncha boshqa fayl so'ralmaydi (tarmoq bo'linmaydi), shu paytda esa
+garaj shaderlari yuklovchi ostida tayyorlanadi. Qolganlari markazdan chetga tartibda, bir vaqtda 2 tadan fonda
 yuklanadi va platformada silliq paydo bo'ladi; kema oxirida (foydalanuvchi skrollni boshlasa — oldinroq).
 Sichqoncha borgan / tanlangan mashina navbatda oldinga o'tadi. Bir model bir necha
 rangda ishlatilishi mumkin (`file`: masalan, oq va qora G 63 — bitta `g63.glb`).
@@ -131,6 +131,10 @@ Tezlik uchun (qotmasligi uchun):
 - telefonda videolar va panellar ustidagi `backdrop-filter` (xiralashtirish) o'rniga zich fon;
 - `manifest.json` dagi `v` — model fayli xeshi: model `?v=...` bilan so'raladi va brauzer keshida
   uzoq saqlanadi (`vercel.json` → `headers`). Model o'zgarsa `npm run models` xeshni o'zi yangilaydi.
+  `manifest.json` saytga yig'ishda JS ichiga qo'shiladi — 3D uchun alohida so'rov kutilmaydi;
+- hovli va port betoni bitta tekstura (bir marta chiziladi); obzor muqovalari bo'lim yaqinlashganda yuklanadi;
+- telefonda (portret) kamera kadrlari alohida: kamera uzoqroq, obyektiv kengroq — konteyner kadrdan chiqmaydi
+  (`src/three/story.js` → `KF`, `only: 'portrait'`).
 
 Yangi model qo'shish:
 

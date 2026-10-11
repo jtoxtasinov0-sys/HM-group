@@ -408,9 +408,10 @@ function createYard(quality) {
   group.add(sky.mesh);
 
   // beton maydon
-  const ct = makeConcreteTextures({ seed: 35, tone: 152 });
   const GW = 160, GD = 110, slab = 6;
-  for (const t of [ct.map, ct.normalMap, ct.roughnessMap]) t.repeat.set(GW / slab, GD / slab);
+  const tile = (t) => { const c = t.clone(); c.repeat.set(GW / slab, GD / slab); return c; };
+  const base = makeConcreteTextures();
+  const ct = { map: tile(base.map), normalMap: tile(base.normalMap), roughnessMap: tile(base.roughnessMap) };
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(GW, GD),
     new THREE.MeshStandardMaterial({ map: ct.map, normalMap: ct.normalMap, roughnessMap: ct.roughnessMap, roughness: 1, metalness: 0, envMapIntensity: 0.8 }),
