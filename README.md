@@ -63,8 +63,9 @@ npm run deploy
 
 Bu saytni yig'adi va Vercel'dagi `hmgroup-uz` loyihasiga yuklaydi (bir marta `vercel login` kerak).
 
-Telegram, Instagram, WhatsApp'da havola rasm bilan chiqadi: rasm — `public/og.jpg` (1200×630),
-sarlavha va matn — `index.html` dagi `og:` teglari. Manzil o'zgarsa, `tools/deploy.mjs` dagi `PROJECT` ni o'zgartiring.
+Telegram, Instagram, WhatsApp'da havola rasm bilan chiqadi: rasm — `public/og.jpg` (1200×630, saytning
+o'zidan olingan: garaj, 11 ta mashina va sarlavha), sarlavha va matn — `index.html` dagi `og:` teglari.
+Rasm manziliga fayl xeshi qo'shiladi (`og.jpg?v=...`, `vite.config.js`): rasm almashtirilsa manzil ham o'zgaradi. Manzil o'zgarsa, `tools/deploy.mjs` dagi `PROJECT` ni o'zgartiring.
 Telegram eski preview'ni eslab qolsa, @WebpageBot ga havolani yuboring — u yangilaydi.
 
 Zaxira: `npm run deploy:github` — GitHub Pages'ga (`gh-pages` branch).
